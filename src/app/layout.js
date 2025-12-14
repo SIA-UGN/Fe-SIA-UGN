@@ -13,7 +13,13 @@ export const metadata = {
   title: 'SIAKAD - Universitas Global Nusantara',
   description: 'Sistem Informasi Akademik UGN',
   icons: {
-    icon: '/logo.ico',
+    icon: [
+      { rel: 'icon', url: '/icon/favicon.ico' },
+      { rel: 'shortcut icon', url: '/icon/favicon.ico' },
+    ],
+    apple: [
+      { rel: 'apple-touch-icon', url: '/icon/apple-touch-icon.png' },
+    ],
   },
 };
 
