@@ -19,7 +19,7 @@ import {
     ErrorMessageBox,
     SuccessMessageBoxWithButton
 } from "@/components/ui/message-box";
-import { AlertConfirmationDialog } from "@/components/ui/alert-dialog";
+import { AlertConfirmationRedDialog } from "@/components/ui/alert-dialog";
 
 export default function AddMahasiswaForm() {
     const router = useRouter();
@@ -692,7 +692,7 @@ export default function AddMahasiswaForm() {
             </div>
         </div>
         </div>
-        <AlertConfirmationDialog
+        <AlertConfirmationRedDialog
             open={showCancelDialog}
             onOpenChange={setShowCancelDialog}
             title="Konfirmasi Pembatalan"

@@ -7,6 +7,7 @@ import { getNotifications, markAsRead } from '@/lib/notificationApi';
 import { getEcho } from '@/lib/echo';
 import { useChatContext } from '@/lib/chat-context';
 import { getProfile } from '@/lib/profileApi';
+import { AlertErrorDialog } from '@/components/ui/alert-dialog';
 
 export default function ChatModal({ isOpen, onClose, userName, userNim = '', userId = '', conversationId: propConversationId = null }) {
     // Chat Context for global state
@@ -19,6 +20,9 @@ export default function ChatModal({ isOpen, onClose, userName, userNim = '', use
     const [conversationId, setConversationId] = useState(propConversationId);
     const [currentUserId, setCurrentUserId] = useState(null);
     const [displayNim, setDisplayNim] = useState(userNim);
+    
+    // Dialog state
+    const [showErrorDialog, setShowErrorDialog] = useState(false);
     
     // Refs
     const messagesEndRef = useRef(null);
@@ -274,7 +278,7 @@ export default function ChatModal({ isOpen, onClose, userName, userNim = '', use
         } catch (error) {
             console.error('Error sending message:', error);
             setMessage(messageToSend);
-            alert('Gagal mengirim pesan. Silakan coba lagi.');
+            setShowErrorDialog(true);
         }
     };
 
@@ -471,6 +475,15 @@ export default function ChatModal({ isOpen, onClose, userName, userNim = '', use
                     </div>
                 </form>
             </div>
+
+            {/* Error Dialog */}
+            <AlertErrorDialog
+                open={showErrorDialog}
+                onOpenChange={setShowErrorDialog}
+                title="Gagal Mengirim Pesan"
+                description="Gagal mengirim pesan. Silakan coba lagi."
+                closeText="Tutup"
+            />
         </div>
     );
 }

@@ -11,6 +11,7 @@ import { getAcademicPeriods, getStudentGrades, downloadTranscriptPDF } from '@/l
 import { getStudentProfile } from '@/lib/profileApi';
 import { getGradeConversions } from '@/lib/gradeConv';
 import { ErrorMessageBoxWithButton } from './message-box';
+import { AlertWarningDialog } from '@/components/ui/alert-dialog';
 
 export default function DetailNilaiMahasiswa() {
 const router = useRouter();
@@ -29,6 +30,7 @@ const [studentInfo, setStudentInfo] = useState({
 });
 const [errors, setErrors] = useState({});
 const [gradeConversions, setGradeConversions] = useState([]);
+const [showWaitDialog, setShowWaitDialog] = useState(false);
 const [summary, setSummary] = useState({
     totalSKSSems: 0,
     totalSkS: 0,
@@ -203,7 +205,7 @@ const columns = [
 const handleExport = async () => {
     setErrors(prev => ({...prev, export: null}));
     if (!selectedSemester) {
-        alert('Silakan tunggu data periode dimuat');
+        setShowWaitDialog(true);
         return;
     }
 
@@ -492,6 +494,15 @@ return (
         </div>
     </div>
     </div>
+
+    {/* Warning Dialog */}
+    <AlertWarningDialog
+        open={showWaitDialog}
+        onOpenChange={setShowWaitDialog}
+        title="Data Belum Siap"
+        description="Silakan tunggu data periode dimuat."
+        closeText="Tutup"
+    />
 </div>
 );
 }

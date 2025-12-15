@@ -11,6 +11,12 @@ import { getClassStudentsWithGrades, saveGradesBulk } from '@/lib/gradingApi';
 import { getGradeConversions } from '@/lib/gradeConv';
 import { ErrorMessageBoxWithButton } from '@/components/ui/message-box';
 import { getPermissionForAClass } from '@/lib/permissionApi';
+import { 
+  AlertConfirmationDialog, 
+  AlertErrorDialog, 
+  AlertSuccessDialog, 
+  AlertWarningDialog 
+} from '@/components/ui/alert-dialog';
 
 export default function InputNilaiMahasiswa() {
   const router = useRouter();
@@ -43,6 +49,14 @@ export default function InputNilaiMahasiswa() {
     ungraded_students: 0
   });
   const [errors, setErrors] = useState({});
+  
+  // Dialog states
+  const [showInvalidDialog, setShowInvalidDialog] = useState(false);
+  const [showUngradedConfirm, setShowUngradedConfirm] = useState(false);
+  const [showNoGradesDialog, setShowNoGradesDialog] = useState(false);
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+  const [ungradedCount, setUngradedCount] = useState(0);
+  const [gradedCount, setGradedCount] = useState(0);
 
   // Fetch data saat component mount
   useEffect(() => {
@@ -138,8 +152,8 @@ export default function InputNilaiMahasiswa() {
           id: student.id_user_si,
           nim: student.nim,
           nama: student.name,
-          nilai: student.grade?.grade || null,
-          id_grades: student.grade?.id_grades || null
+          nilai: student.grade?.grade ?? null,
+          id_grades: student.grade?.id_grades ?? null
         }));
         
         setMahasiswaData(formattedData);
@@ -288,17 +302,20 @@ export default function InputNilaiMahasiswa() {
     );
     
     if (nilaiInvalid.length > 0) {
-      alert('Ada nilai yang tidak valid (harus 0-100). Mohon perbaiki terlebih dahulu.');
+      setShowInvalidDialog(true);
       return;
     }
     
     if (belumDinilai.length > 0) {
-      const confirm = window.confirm(
-        `Masih ada ${belumDinilai.length} mahasiswa yang belum dinilai. Lanjutkan menyimpan?`
-      );
-      if (!confirm) return;
+      setUngradedCount(belumDinilai.length);
+      setShowUngradedConfirm(true);
+      return;
     }
 
+    await processSave();
+  };
+
+  const processSave = async () => {
     setIsSaving(true);
     setErrors(prev => ({...prev, save: null}));
     try {
@@ -311,15 +328,15 @@ export default function InputNilaiMahasiswa() {
         }));
       
       if (gradesToSave.length === 0) {
-        alert('Tidak ada nilai yang akan disimpan.');
+        setShowNoGradesDialog(true);
         return;
       }
       
       const response = await saveGradesBulk(classId, gradesToSave);
       
       if (response.status === 'success') {
-        alert(`Berhasil menyimpan nilai untuk ${gradesToSave.length} mahasiswa!`);
-        router.back();
+        setGradedCount(gradesToSave.length);
+        setShowSuccessDialog(true);
       } else {
         setErrors(prev => ({...prev, save: 'Gagal menyimpan nilai: ' + response.message}));
       }
@@ -512,6 +529,47 @@ export default function InputNilaiMahasiswa() {
           </div>
         </div>
       </div>
+
+      {/* Alert Dialogs */}
+      <AlertWarningDialog
+        open={showInvalidDialog}
+        onOpenChange={setShowInvalidDialog}
+        title="Nilai Tidak Valid"
+        description="Ada nilai yang tidak valid (harus 0-100). Mohon perbaiki terlebih dahulu."
+        closeText="Tutup"
+      />
+
+      <AlertConfirmationDialog
+        open={showUngradedConfirm}
+        onOpenChange={setShowUngradedConfirm}
+        title="Konfirmasi Simpan"
+        description={`Masih ada ${ungradedCount} mahasiswa yang belum dinilai. Lanjutkan menyimpan?`}
+        confirmText="Lanjutkan"
+        cancelText="Batal"
+        onConfirm={() => {
+          setShowUngradedConfirm(false);
+          processSave();
+        }}
+      />
+
+      <AlertWarningDialog
+        open={showNoGradesDialog}
+        onOpenChange={setShowNoGradesDialog}
+        title="Tidak Ada Nilai"
+        description="Tidak ada nilai yang akan disimpan."
+        closeText="Tutup"
+      />
+
+      <AlertSuccessDialog
+        open={showSuccessDialog}
+        onOpenChange={(open) => {
+          setShowSuccessDialog(open);
+          if (!open) router.back();
+        }}
+        title="Berhasil Disimpan"
+        description={`Berhasil menyimpan nilai untuk ${gradedCount} mahasiswa!`}
+        closeText="Tutup"
+      />
     </div>
   );
 }
