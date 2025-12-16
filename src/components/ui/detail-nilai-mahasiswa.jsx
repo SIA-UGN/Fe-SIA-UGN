@@ -8,7 +8,7 @@ import { PrimaryButton, OutlineButton } from '@/components/ui/button';
 import Navbar from '@/components/ui/navigation-menu';
 import LoadingEffect from '@/components/ui/loading-effect';
 import { getAcademicPeriods, getStudentGrades, downloadTranscriptPDF } from '@/lib/gradingApi';
-import { getStudentProfile } from '@/lib/profileApi';
+import { getProfile } from '@/lib/profileApi';
 import { getGradeConversions } from '@/lib/gradeConv';
 import { ErrorMessageBoxWithButton } from './message-box';
 import { AlertWarningDialog } from '@/components/ui/alert-dialog';
@@ -74,6 +74,8 @@ useEffect(() => {
                 const activePeriod = options.find(opt => opt.is_active);
                 if (activePeriod) {
                     setSelectedSemester(activePeriod.value);
+                } else if (options.length > 0) {
+                    setSelectedSemester(options[options.length - 1]?.value || '');
                 }
             } else {
                 setErrors(prev => ({...prev, fetch: 'Gagal memuat data: ' + response.message }));
@@ -86,13 +88,13 @@ useEffect(() => {
 // Fetch Student Info
 const fetchStudentInfo = async () => {
     try {
-        const response = await getStudentProfile();
+        const response = await getProfile();
         
         if (response.status === 'success' && response.data) {
             setStudentInfo({
-                nim: response.data.registration_number || '-',
-                name: response.data.full_name || '-',
-                program: response.data.program_name || '-'
+                nim: response.data.student_data.registration_number || '-',
+                name: response.data.name || '-',
+                program: response.data.student_data.program_name || '-'
             });
         } else {
             setErrors(prev => ({...prev, fetch: 'Gagal memuat data: ' + response.message }));
@@ -500,7 +502,7 @@ return (
         open={showWaitDialog}
         onOpenChange={setShowWaitDialog}
         title="Data Belum Siap"
-        description="Silakan tunggu data periode dimuat."
+        description="Silakan tunggu data nilai dimuat."
         closeText="Tutup"
     />
 </div>

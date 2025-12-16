@@ -62,7 +62,7 @@ export default function AkademikPage() {
 				if (activePeriod) {
 					setSelectedSemester(activePeriod.value);
 				} else if (options.length > 0) {
-					setSelectedSemester(options[0].value);
+					setSelectedSemester(options[options.length - 1].value);
 				}
 			} else {
 				setErrors(prev => ({...prev, fetch: 'Gagal memuat data periode akademik: ' + response.message}));

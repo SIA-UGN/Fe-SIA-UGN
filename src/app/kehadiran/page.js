@@ -84,6 +84,8 @@ export default function KehadiranPage() {
 				const activePeriod = options.find(opt => opt.is_active);
 				if (activePeriod) {
 					setSelectedSemester(activePeriod.value);
+				} else if (options.length > 0) {
+					setSelectedSemester(options[options.length - 1].value);
 				}
 			} else {
 				setErrors(prev => ({...prev, fetch: 'Gagal memuat data: ' + response.message}));
