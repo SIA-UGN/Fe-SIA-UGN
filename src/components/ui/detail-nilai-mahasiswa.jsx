@@ -239,7 +239,7 @@ const handleExport = async () => {
         window.URL.revokeObjectURL(url);
         
     } catch (error) {
-        setErrors(prev => ({...prev, export: 'Gagal mengunduh PDF. Silakan coba lagi.'}));
+        setErrors(prev => ({...prev, export: 'Gagal mengunduh PDF: Gagal mengambil data atau data nilai untuk semester ini belum ada. Silakan coba lagi.'}));
     } finally {
         setIsDownloading(false);
     }
