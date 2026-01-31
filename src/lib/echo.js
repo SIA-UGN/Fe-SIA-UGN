@@ -89,13 +89,23 @@ export const getEcho = () => {
     };
   } else {
     // Reverb (self-hosted) configuration
+    // Normalize host: strip protocol and trailing slashes to avoid
+    // constructing URLs like "wss://https://host/..."
+    const rawHost = process.env.NEXT_PUBLIC_REVERB_HOST || 'localhost';
+    const normalizedHost = rawHost.replace(/^https?:\/\//i, '').replace(/\/+$/, '');
+
+    // Choose sensible default ports based on TLS flag
+    const tlsEnabled = (process.env.NEXT_PUBLIC_REVERB_TLS || 'false') === 'true';
+    const defaultPort = tlsEnabled ? 443 : 80;
+    const port = Number(process.env.NEXT_PUBLIC_REVERB_PORT || defaultPort);
+
     config = {
       broadcaster: 'reverb',
       key: process.env.NEXT_PUBLIC_REVERB_APP_KEY || process.env.NEXT_PUBLIC_REVERB_KEY || 'rfmp9pmudhfkb6dvdybr',
-      wsHost: process.env.NEXT_PUBLIC_REVERB_HOST || 'localhost',
-      wsPort: Number(process.env.NEXT_PUBLIC_REVERB_PORT || 9090),
-      wssPort: Number(process.env.NEXT_PUBLIC_REVERB_PORT || 9090),
-      forceTLS: (process.env.NEXT_PUBLIC_REVERB_TLS || 'false') === 'true',
+      wsHost: normalizedHost,
+      wsPort: port,
+      wssPort: port,
+      forceTLS: tlsEnabled,
       enabledTransports: ['ws', 'wss'],
       disableStats: true,
       authEndpoint: `${cleanBaseUrl}/broadcasting/auth`,
