@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback, Fragment, forwardRef } from "react"
 import Link from 'next/link'
 import Image from 'next/image'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { User, UserCog, LogOut, Menu, X } from 'lucide-react'
 import { cn } from "@/lib/utils"
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
@@ -18,6 +18,7 @@ import {
 import { AlertConfirmationRedDialog } from '@/components/ui/alert-dialog'
 import ChatModal from '@/components/ui/chatmodal'
 import NavbarNotification from '@/components/ui/navbar-notification'
+import PersuratanDropdown from '@/features/persuratan/components/PersuratanDropdown'
 import { useAuth } from '@/lib/auth-context'
 import { logout } from '@/lib/sessionApi'
 
@@ -54,11 +55,12 @@ const NavbarMenu = forwardRef(({ className, isMobileMenuOpen, setIsMobileMenuOpe
       <NavbarMenuItem href="/akademik">Akademik</NavbarMenuItem>
       <NavbarMenuItem href="/kehadiran">Kehadiran</NavbarMenuItem>
       <NavbarMenuItem href="/hasil-studi">Hasil Studi</NavbarMenuItem>
+      <PersuratanDropdown />
     </div>
 
     {/* Mobile Menu Overlay */}
     {isMobileMenuOpen && (
-      <div 
+      <div
         className="fixed inset-0 z-40 md:hidden"
         style={{ backgroundColor: 'rgba(0, 0, 0, 0.3)' }}
         onClick={() => setIsMobileMenuOpen(false)}
@@ -85,23 +87,35 @@ const NavbarMenu = forwardRef(({ className, isMobileMenuOpen, setIsMobileMenuOpe
 
       {/* Mobile Menu Items */}
       <div className="flex flex-col p-4 gap-2">
-        <MobileNavMenuItem 
-          href="/akademik" 
+        <MobileNavMenuItem
+          href="/akademik"
           onClick={() => setIsMobileMenuOpen(false)}
         >
           Akademik
         </MobileNavMenuItem>
-        <MobileNavMenuItem 
-          href="/kehadiran" 
+        <MobileNavMenuItem
+          href="/kehadiran"
           onClick={() => setIsMobileMenuOpen(false)}
         >
           Kehadiran
         </MobileNavMenuItem>
-        <MobileNavMenuItem 
-          href="/hasil-studi" 
+        <MobileNavMenuItem
+          href="/hasil-studi"
           onClick={() => setIsMobileMenuOpen(false)}
         >
           Hasil Studi
+        </MobileNavMenuItem>
+        <MobileNavMenuItem
+          href="/persuratan/ajukan"
+          onClick={() => setIsMobileMenuOpen(false)}
+        >
+          Ajukan Surat
+        </MobileNavMenuItem>
+        <MobileNavMenuItem
+          href="/persuratan/status"
+          onClick={() => setIsMobileMenuOpen(false)}
+        >
+          Status Persuratan
         </MobileNavMenuItem>
       </div>
     </div>
@@ -109,9 +123,9 @@ const NavbarMenu = forwardRef(({ className, isMobileMenuOpen, setIsMobileMenuOpe
 ))
 
 const MobileNavMenuItem = forwardRef(({ className, href, children, onClick, ...props }, ref) => {
-  const pathname = typeof window !== 'undefined' ? window.location.pathname : '';
+  const pathname = usePathname();
   const isActive = pathname === href;
-  
+
   return (
     <Link
       href={href}
@@ -119,8 +133,8 @@ const MobileNavMenuItem = forwardRef(({ className, href, children, onClick, ...p
       onClick={onClick}
       className={cn(
         "px-4 py-3 rounded-lg font-medium text-base transition-colors duration-200",
-        isActive 
-          ? "bg-green-50 text-green-700" 
+        isActive
+          ? "bg-green-50 text-green-700"
           : "text-gray-700 hover:bg-gray-50",
         className
       )}
@@ -133,10 +147,10 @@ const MobileNavMenuItem = forwardRef(({ className, href, children, onClick, ...p
 })
 
 const NavbarMenuItem = forwardRef(({ className, href, children, ...props }, ref) => {
-  const pathname = typeof window !== 'undefined' ? window.location.pathname : '';
+  const pathname = usePathname();
   const isActive = pathname === href;
   const [isHovered, setIsHovered] = useState(false);
-  
+
   return (
     <Link
       href={href}
@@ -152,7 +166,7 @@ const NavbarMenuItem = forwardRef(({ className, href, children, ...props }, ref)
     >
       {children}
       {(isActive || isHovered) && (
-        <span 
+        <span
           className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full transition-opacity duration-200"
           style={{ backgroundColor: '#DABC4E' }}
         />
@@ -180,7 +194,7 @@ const NavbarActions = forwardRef(({ className, isScrolled, ...props }, ref) => {
         )}
         {...props}
       >
-        <NavbarNotification 
+        <NavbarNotification
           isChatOpen={isChatOpen}
           chatUser={chatUser}
           setChatUser={setChatUser}
@@ -189,7 +203,7 @@ const NavbarActions = forwardRef(({ className, isScrolled, ...props }, ref) => {
         />
         <NavbarProfile isScrolled={isScrolled} />
       </div>
-      
+
       {/* Chat Modal */}
       <ChatModal
         isOpen={isChatOpen}
@@ -330,12 +344,12 @@ const Navbar = forwardRef(({ className, ...props }, ref) => {
         ref={ref}
         className={cn(
           "bg-brand-green transition-all duration-300 ease-in-out",
-          isScrolled 
-            ? "mx-4 sm:mx-6 lg:mx-8 rounded-[12px] sm:rounded-[18px]" 
+          isScrolled
+            ? "mx-4 sm:mx-6 lg:mx-8 rounded-[12px] sm:rounded-[18px]"
             : "shadow-md rounded-b-[12px] sm:rounded-b-[18px] rounded-t-none",
           className
         )}
-        style={{ 
+        style={{
           backgroundColor: '#015023',
           ...(isScrolled && {
             boxShadow: '0 10px 40px rgba(0, 0, 0, 0.15), 0 4px 12px rgba(0, 0, 0, 0.1)'
@@ -350,22 +364,22 @@ const Navbar = forwardRef(({ className, ...props }, ref) => {
               <button
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
                 className="md:hidden text-white hover:text-gray-200 transition-colors p-2"
-              aria-label="Toggle menu"
-            >
-              <Menu size={24} className="transition-all duration-300" />
-            </button>
-            <NavbarBrand isScrolled={isScrolled} />
-          </div>
-          <div className="flex items-center gap-6 sm:gap-10 lg:gap-13">
-            <NavbarMenu 
-              isMobileMenuOpen={isMobileMenuOpen}
-              setIsMobileMenuOpen={setIsMobileMenuOpen}
-            />
-            <NavbarActions isScrolled={isScrolled} />
+                aria-label="Toggle menu"
+              >
+                <Menu size={24} className="transition-all duration-300" />
+              </button>
+              <NavbarBrand isScrolled={isScrolled} />
+            </div>
+            <div className="flex items-center gap-6 sm:gap-10 lg:gap-13">
+              <NavbarMenu
+                isMobileMenuOpen={isMobileMenuOpen}
+                setIsMobileMenuOpen={setIsMobileMenuOpen}
+              />
+              <NavbarActions isScrolled={isScrolled} />
+            </div>
           </div>
         </div>
-      </div>
-    </nav>
+      </nav>
     </div>
   );
 })
