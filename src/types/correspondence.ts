@@ -32,6 +32,23 @@ export const correspondenceService = {
         });
     },
 
+    // Update Letter (Multipart — uses POST + _method PATCH for Laravel)
+    update: async (id: number, payload: CorrespondencePayload) => {
+        const formData = new FormData();
+        formData.append('_method', 'PATCH');
+        formData.append('id_category', String(payload.id_category));
+        formData.append('id_recipient', String(payload.id_recipient));
+        formData.append('title', payload.title);
+        formData.append('correspondence_body', payload.correspondence_body);
+        if (payload.attachment) {
+            formData.append('attachment', payload.attachment);
+        }
+
+        return await axiosInstance.post(`/correspondence/${id}`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        });
+    },
+
     // Delete Letter
     delete: async (id: number) => {
         return await axiosInstance.delete(`/correspondence/${id}`);
@@ -49,14 +66,37 @@ export const correspondenceService = {
     },
 
     // --- ADMIN / MANAGER ONLY ---
-
-    // Respond to letter
+    // Membalas surat dan mengubah status
     respond: async (id: number, payload: { status: string; response_text: string }) => {
-        return await axiosInstance.patch(`/correspondence/${id}/respond`, payload);
+        const { data } = await axiosInstance.patch(`/correspondence/${id}/respond`, payload);
+        return data;
     },
 
-    // Update Status Only
+    // Mengubah status tanpa balasan
     updateStatus: async (id: number, status: string) => {
-        return await axiosInstance.patch(`/correspondence/${id}/status`, { status });
+        const { data } = await axiosInstance.patch(`/correspondence/${id}/status`, { status });
+        return data;
+    },
+
+    // CRUD Kategori
+    createCategory: async (payload: { name: string; slug: string; description?: string }) => {
+        return await axiosInstance.post('/correspondence/categories', payload);
+    },
+    updateCategory: async (id: number, payload: any) => {
+        return await axiosInstance.patch(`/correspondence/categories/${id}`, payload);
+    },
+    deleteCategory: async (id: number) => {
+        return await axiosInstance.delete(`/correspondence/categories/${id}`);
+    },
+
+    // CRUD Penerima (Sama seperti kategori)
+    createRecipient: async (payload: { name: string; slug: string; description?: string }) => {
+        return await axiosInstance.post('/correspondence/recipients', payload);
+    },
+    updateRecipient: async (id: number, payload: any) => {
+        return await axiosInstance.patch(`/correspondence/recipients/${id}`, payload);
+    },
+    deleteRecipient: async (id: number) => {
+        return await axiosInstance.delete(`/correspondence/recipients/${id}`);
     }
 };

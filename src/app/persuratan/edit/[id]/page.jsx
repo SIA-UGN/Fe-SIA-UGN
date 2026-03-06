@@ -1,16 +1,28 @@
 'use client';
 
+import { use } from 'react';
 import Navbar from '@/components/ui/navigation-menu';
 import Footer from '@/components/ui/footer';
 import { Container, SectionTitle } from '@/components/ui/container-dashboard';
-import StatusTable from '@/features/persuratan/components/StatusTable';
-import { useStatusPersuratan } from '@/features/persuratan/hooks/useStatusPersuratan';
-import { ChevronRight, Plus, Home } from 'lucide-react';
+import AjukanForm from '@/features/persuratan/components/AjukanForm';
+import { useEditSurat } from '@/features/persuratan/hooks/useEditSurat';
+import { ChevronRight, Home } from 'lucide-react';
 import Link from 'next/link';
-import { Button } from '@/components/ui/button';
 
-export default function StatusPersuratanPage() {
-    const { data, isLoading, error, refetch, deleteLetter, isDeleting, deletingId } = useStatusPersuratan();
+export default function EditSuratPage({ params }) {
+    // Next.js 15: params is a Promise, unwrap with React.use()
+    const { id } = use(params);
+
+    const {
+        initialData,
+        categories,
+        recipients,
+        isLoading,
+        isSubmitting,
+        error,
+        submitError,
+        onSubmit,
+    } = useEditSurat(id);
 
     return (
         <div
@@ -66,42 +78,51 @@ export default function StatusPersuratanPage() {
                         </Link>
                         <ChevronRight size={14} style={{ color: '#9CA3AF' }} />
                         <span style={{ color: '#015023', fontWeight: 600 }}>
-                            Status Pengajuan
+                            Edit Surat
                         </span>
                     </nav>
 
-                    {/* Title row with action button */}
-                    <div className="flex items-center justify-between mb-6">
-                        <div>
-                            <SectionTitle className="!mb-0">Layanan Persuratan</SectionTitle>
-                            <p
-                                style={{
-                                    fontFamily: 'Urbanist, sans-serif',
-                                    fontSize: '15px',
-                                    color: '#6B7280',
-                                    marginTop: '4px',
-                                }}
-                            >
-                                Pantau status keluhan yang telah Anda ajukan
-                            </p>
-                        </div>
-                        <Link href="/persuratan/ajukan">
-                            <Button variant="primary" className="gap-2">
-                                <Plus size={18} />
-                                Ajukan Surat
-                            </Button>
-                        </Link>
+                    {/* Page title */}
+                    <div className="mb-6">
+                        <SectionTitle className="!mb-0">Edit Surat</SectionTitle>
+                        <p
+                            style={{
+                                fontFamily: 'Urbanist, sans-serif',
+                                fontSize: '15px',
+                                color: '#6B7280',
+                                marginTop: '4px',
+                            }}
+                        >
+                            Ubah detail pengajuan surat Anda
+                        </p>
                     </div>
 
-                    {/* Status table */}
-                    <StatusTable
-                        data={data}
+                    {/* Global fetch error */}
+                    {error && (
+                        <div
+                            className="mb-6 p-4 text-sm"
+                            style={{
+                                backgroundColor: '#FEF2F2',
+                                color: '#BE0414',
+                                borderRadius: '12px',
+                                border: '1px solid #FECACA',
+                                fontFamily: 'Urbanist, sans-serif',
+                            }}
+                        >
+                            {error}
+                        </div>
+                    )}
+
+                    {/* Form card — reused with edit mode */}
+                    <AjukanForm
+                        categories={categories}
+                        recipients={recipients}
                         isLoading={isLoading}
-                        error={error}
-                        refetch={refetch}
-                        onDelete={deleteLetter}
-                        isDeleting={isDeleting}
-                        deletingId={deletingId}
+                        isSubmitting={isSubmitting}
+                        submitError={submitError}
+                        onSubmit={onSubmit}
+                        initialData={initialData}
+                        isEditMode
                     />
                 </Container>
             </main>

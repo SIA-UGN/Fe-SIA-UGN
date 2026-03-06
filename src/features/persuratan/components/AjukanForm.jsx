@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import Link from 'next/link';
-import { FileText, Upload, X, FileIcon } from 'lucide-react';
+import { FileText, Upload, X, FileIcon, Paperclip, ExternalLink } from 'lucide-react';
 import { Button, OutlineButton } from '@/components/ui/button';
 
 // ── Zod Validation Schema ──────────────────────────────────────────
@@ -33,16 +33,22 @@ export default function AjukanForm({
     isSubmitting = false,
     submitError = null,
     onSubmit,
+    initialData = null,
+    isEditMode = false,
 }) {
     const [attachment, setAttachment] = useState(null);
     const [dragActive, setDragActive] = useState(false);
     const [fileError, setFileError] = useState(null);
     const fileInputRef = useRef(null);
 
+    // Track existing attachment URL in edit mode
+    const [currentAttachmentUrl, setCurrentAttachmentUrl] = useState(null);
+
     const {
         register,
         handleSubmit,
         watch,
+        reset,
         formState: { errors },
     } = useForm({
         resolver: zodResolver(ajukanSchema),
@@ -53,6 +59,27 @@ export default function AjukanForm({
             body: '',
         },
     });
+
+    // Pre-fill form fields when initialData arrives (edit mode)
+    // Also depends on categories/recipients so reset fires after <option>s exist
+    useEffect(() => {
+        if (initialData && isEditMode && categories.length > 0 && recipients.length > 0) {
+            const catId = initialData.id_category || initialData.category?.id_category || '';
+            const recId = initialData.id_recipient || initialData.recipient?.id_recipient || '';
+
+            reset({
+                title: initialData.title || '',
+                category_id: String(catId),
+                recipient_id: String(recId),
+                body: initialData.correspondence_body || '',
+            });
+
+            // Set the existing attachment URL
+            if (initialData.attachment_url) {
+                setCurrentAttachmentUrl(initialData.attachment_url);
+            }
+        }
+    }, [initialData, isEditMode, reset, categories, recipients]);
 
     const bodyValue = watch('body');
 
@@ -105,15 +132,17 @@ export default function AjukanForm({
     });
 
     // ── Shared styles ────────────────────────────────────────────────
+    const font = { fontFamily: 'Urbanist, sans-serif' };
+
     const labelStyle = {
-        fontFamily: 'Urbanist, sans-serif',
+        ...font,
         fontWeight: 600,
         fontSize: '15px',
         color: '#015023',
     };
 
     const inputStyle = {
-        fontFamily: 'Urbanist, sans-serif',
+        ...font,
         fontSize: '14px',
         borderRadius: '12px',
         border: '1px solid #d1d5db',
@@ -135,7 +164,7 @@ export default function AjukanForm({
     };
 
     const errorStyle = {
-        fontFamily: 'Urbanist, sans-serif',
+        ...font,
         fontSize: '13px',
         color: '#BE0414',
         marginTop: '4px',
@@ -146,22 +175,47 @@ export default function AjukanForm({
         return (
             <div
                 className="bg-white shadow-lg overflow-hidden"
-                style={{ borderRadius: '12px', fontFamily: 'Urbanist, sans-serif' }}
+                style={{ borderRadius: '12px', ...font }}
             >
                 <div
                     className="text-white px-6 py-4 flex items-center gap-3"
                     style={{ backgroundColor: '#015023' }}
                 >
                     <FileText size={20} />
-                    <span className="font-semibold">Formulir Pengajuan Keluhan</span>
+                    <span className="font-semibold">{isEditMode ? 'Edit Surat' : 'Formulir Pengajuan Keluhan'}</span>
                 </div>
-                <div className="p-8 space-y-6">
-                    {[1, 2, 3, 4].map((i) => (
-                        <div key={i} className="space-y-2">
-                            <div className="h-4 bg-gray-200 rounded w-32 animate-pulse" />
+                <div className="p-8 space-y-7">
+                    {/* Title field skeleton */}
+                    <div className="space-y-2">
+                        <div className="h-4 bg-gray-200 rounded w-28 animate-pulse" />
+                        <div className="h-12 bg-gray-100 rounded-xl animate-pulse" />
+                    </div>
+                    {/* Category + Recipient side-by-side skeleton */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                            <div className="h-4 bg-gray-200 rounded w-36 animate-pulse" />
                             <div className="h-12 bg-gray-100 rounded-xl animate-pulse" />
                         </div>
-                    ))}
+                        <div className="space-y-2">
+                            <div className="h-4 bg-gray-200 rounded w-20 animate-pulse" />
+                            <div className="h-12 bg-gray-100 rounded-xl animate-pulse" />
+                        </div>
+                    </div>
+                    {/* Body textarea skeleton */}
+                    <div className="space-y-2">
+                        <div className="h-4 bg-gray-200 rounded w-32 animate-pulse" />
+                        <div className="h-32 bg-gray-100 rounded-xl animate-pulse" />
+                    </div>
+                    {/* Attachment skeleton */}
+                    <div className="space-y-2">
+                        <div className="h-4 bg-gray-200 rounded w-24 animate-pulse" />
+                        <div className="h-28 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200 animate-pulse" />
+                    </div>
+                    {/* Buttons skeleton */}
+                    <div className="flex items-center justify-between pt-4">
+                        <div className="h-10 w-24 bg-gray-100 rounded-lg animate-pulse" />
+                        <div className="h-10 w-40 bg-gray-200 rounded-lg animate-pulse" />
+                    </div>
                 </div>
             </div>
         );
@@ -171,7 +225,7 @@ export default function AjukanForm({
     return (
         <div
             className="bg-white shadow-lg overflow-hidden"
-            style={{ borderRadius: '12px', fontFamily: 'Urbanist, sans-serif' }}
+            style={{ borderRadius: '12px', ...font }}
         >
             {/* Card header */}
             <div
@@ -179,7 +233,7 @@ export default function AjukanForm({
                 style={{ backgroundColor: '#015023', borderRadius: '12px 12px 0 0' }}
             >
                 <FileText size={20} />
-                <span className="font-semibold text-base">Formulir Pengajuan Keluhan</span>
+                <span className="font-semibold text-base">{isEditMode ? 'Edit Surat' : 'Formulir Pengajuan Keluhan'}</span>
             </div>
 
             {/* Form body */}
@@ -193,7 +247,7 @@ export default function AjukanForm({
                             color: '#BE0414',
                             borderRadius: '12px',
                             border: '1px solid #FECACA',
-                            fontFamily: 'Urbanist, sans-serif',
+                            ...font,
                         }}
                     >
                         {submitError}
@@ -320,7 +374,7 @@ export default function AjukanForm({
                         )}
                         <span
                             style={{
-                                fontFamily: 'Urbanist, sans-serif',
+                                ...font,
                                 fontSize: '13px',
                                 color: '#9CA3AF',
                             }}
@@ -330,13 +384,123 @@ export default function AjukanForm({
                     </div>
                 </div>
 
-                {/* Lampiran (opsional) */}
+                {/* Lampiran */}
                 <div>
                     <label style={labelStyle}>
                         Lampiran <span style={{ fontWeight: 400, color: '#9CA3AF' }}>(opsional)</span>
                     </label>
 
-                    {!attachment ? (
+                    {/* ── Current Attachment Preview (edit mode only) ──── */}
+                    {isEditMode && currentAttachmentUrl && !attachment && (
+                        <div
+                            className="flex items-center gap-3 p-4"
+                            style={{
+                                marginTop: '8px',
+                                borderRadius: '12px',
+                                backgroundColor: '#EFF6FF',
+                                border: '1px solid #BFDBFE',
+                            }}
+                        >
+                            <div
+                                className="flex items-center justify-center"
+                                style={{
+                                    width: '40px',
+                                    height: '40px',
+                                    borderRadius: '10px',
+                                    backgroundColor: '#DBEAFE',
+                                    flexShrink: 0,
+                                }}
+                            >
+                                <Paperclip size={18} style={{ color: '#2563EB' }} />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <p
+                                    style={{
+                                        ...font,
+                                        fontSize: '14px',
+                                        fontWeight: 600,
+                                        color: '#1E40AF',
+                                    }}
+                                >
+                                    Dokumen saat ini terlampir
+                                </p>
+                                <a
+                                    href={currentAttachmentUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 hover:underline"
+                                    style={{
+                                        ...font,
+                                        fontSize: '13px',
+                                        color: '#2563EB',
+                                        fontWeight: 500,
+                                    }}
+                                >
+                                    <ExternalLink size={12} />
+                                    Lihat / Unduh Dokumen
+                                </a>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ── New file selected (replacing existing) ──── */}
+                    {attachment ? (
+                        <div
+                            className="flex items-center gap-3 p-4"
+                            style={{
+                                marginTop: '8px',
+                                borderRadius: '12px',
+                                border: '1px solid #d1d5db',
+                                backgroundColor: '#F9FAFB',
+                            }}
+                        >
+                            <FileIcon size={20} style={{ color: '#16874B', flexShrink: 0 }} />
+                            <div className="flex-1 min-w-0">
+                                <p
+                                    className="truncate"
+                                    style={{
+                                        ...font,
+                                        fontSize: '14px',
+                                        fontWeight: 500,
+                                        color: '#015023',
+                                    }}
+                                >
+                                    {attachment.name}
+                                </p>
+                                <p
+                                    style={{
+                                        ...font,
+                                        fontSize: '12px',
+                                        color: '#9CA3AF',
+                                    }}
+                                >
+                                    {(attachment.size / 1024 / 1024).toFixed(2)} MB
+                                    {isEditMode && currentAttachmentUrl && (
+                                        <span style={{ color: '#D97706', fontWeight: 500, marginLeft: '8px' }}>
+                                            — Akan menggantikan lampiran lama
+                                        </span>
+                                    )}
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={removeFile}
+                                className="flex items-center justify-center hover:opacity-70 transition-opacity"
+                                style={{
+                                    width: '32px',
+                                    height: '32px',
+                                    borderRadius: '50%',
+                                    backgroundColor: '#FEE2E2',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    flexShrink: 0,
+                                }}
+                            >
+                                <X size={16} style={{ color: '#BE0414' }} />
+                            </button>
+                        </div>
+                    ) : (
+                        /* ── Drag & drop upload zone ──── */
                         <div
                             onDragEnter={handleDrag}
                             onDragLeave={handleDrag}
@@ -367,73 +531,25 @@ export default function AjukanForm({
                             </div>
                             <p
                                 style={{
-                                    fontFamily: 'Urbanist, sans-serif',
+                                    ...font,
                                     fontWeight: 600,
                                     fontSize: '14px',
                                     color: '#015023',
                                 }}
                             >
-                                Seret &amp; lepas file di sini
+                                {isEditMode && currentAttachmentUrl
+                                    ? 'Unggah dokumen baru untuk mengganti'
+                                    : 'Seret & lepas file di sini'}
                             </p>
-                            <p style={{ fontFamily: 'Urbanist, sans-serif', fontSize: '13px', color: '#6b7280' }}>
+                            <p style={{ ...font, fontSize: '13px', color: '#6b7280' }}>
                                 atau{' '}
                                 <span style={{ textDecoration: 'underline', color: '#015023', fontWeight: 500 }}>
                                     klik untuk memilih file
                                 </span>
                             </p>
-                            <p style={{ fontFamily: 'Urbanist, sans-serif', fontSize: '12px', color: '#9CA3AF' }}>
+                            <p style={{ ...font, fontSize: '12px', color: '#9CA3AF' }}>
                                 PDF, DOC, JPG, PNG hingga 10MB
                             </p>
-                        </div>
-                    ) : (
-                        <div
-                            className="flex items-center gap-3 p-4"
-                            style={{
-                                marginTop: '8px',
-                                borderRadius: '12px',
-                                border: '1px solid #d1d5db',
-                                backgroundColor: '#F9FAFB',
-                            }}
-                        >
-                            <FileIcon size={20} style={{ color: '#16874B', flexShrink: 0 }} />
-                            <div className="flex-1 min-w-0">
-                                <p
-                                    className="truncate"
-                                    style={{
-                                        fontFamily: 'Urbanist, sans-serif',
-                                        fontSize: '14px',
-                                        fontWeight: 500,
-                                        color: '#015023',
-                                    }}
-                                >
-                                    {attachment.name}
-                                </p>
-                                <p
-                                    style={{
-                                        fontFamily: 'Urbanist, sans-serif',
-                                        fontSize: '12px',
-                                        color: '#9CA3AF',
-                                    }}
-                                >
-                                    {(attachment.size / 1024 / 1024).toFixed(2)} MB
-                                </p>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={removeFile}
-                                className="flex items-center justify-center hover:opacity-70 transition-opacity"
-                                style={{
-                                    width: '32px',
-                                    height: '32px',
-                                    borderRadius: '50%',
-                                    backgroundColor: '#FEE2E2',
-                                    border: 'none',
-                                    cursor: 'pointer',
-                                    flexShrink: 0,
-                                }}
-                            >
-                                <X size={16} style={{ color: '#BE0414' }} />
-                            </button>
                         </div>
                     )}
 
@@ -460,7 +576,10 @@ export default function AjukanForm({
                         disabled={isSubmitting}
                         style={{ minWidth: '160px' }}
                     >
-                        {isSubmitting ? 'Mengirim...' : 'Kirim Pengajuan'}
+                        {isSubmitting
+                            ? (isEditMode ? 'Menyimpan...' : 'Mengirim...')
+                            : (isEditMode ? 'Simpan Perubahan' : 'Kirim Pengajuan')
+                        }
                     </Button>
                 </div>
             </form>

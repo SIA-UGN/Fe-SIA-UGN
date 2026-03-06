@@ -5,13 +5,15 @@ import { correspondenceService } from '@/types/correspondence';
 
 /**
  * Custom hook for the "Status Persuratan" page.
- * Fetches all correspondence data and manages loading/error states.
- * Zero UI awareness — returns only data and state.
+ * Fetches all correspondence data, manages loading/error states,
+ * and provides a delete function with optimistic update.
  */
 export function useStatusPersuratan() {
     const [data, setData] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [deletingId, setDeletingId] = useState(null);
 
     const fetchData = useCallback(async () => {
         setIsLoading(true);
@@ -35,10 +37,37 @@ export function useStatusPersuratan() {
         fetchData();
     }, [fetchData]);
 
+    /**
+     * Delete a letter by ID.
+     * Optimistically removes the item from local state on success.
+     */
+    const deleteLetter = useCallback(async (id) => {
+        setIsDeleting(true);
+        setDeletingId(id);
+        try {
+            await correspondenceService.delete(id);
+            // Optimistic: remove from local state
+            setData((prev) => prev.filter((item) => item.id_correspondence !== id));
+        } catch (err) {
+            console.error('[useStatusPersuratan] Delete error:', err);
+            setError(
+                err?.response?.data?.message ||
+                err?.message ||
+                'Gagal menghapus surat.'
+            );
+        } finally {
+            setIsDeleting(false);
+            setDeletingId(null);
+        }
+    }, []);
+
     return {
         data,
         isLoading,
         error,
+        isDeleting,
+        deletingId,
         refetch: fetchData,
+        deleteLetter,
     };
 }
