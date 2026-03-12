@@ -28,12 +28,12 @@ api.interceptors.response.use(
     const message = (error && error.message) || '';
     const isTimeout = error?.code === 'ECONNABORTED' || message.toLowerCase().includes('timeout');
     const isNetworkError = !error?.response && (
-      message.toLowerCase().includes('network') || message.toLowerCase().includes('failed')
+      message.toLowerCase() === 'network error' || message.toLowerCase().includes('failed to fetch')
     );
 
+    // If it's a true network error, simplify the message
     if (isTimeout || isNetworkError) {
       const userMessage = 'Tidak dapat terhubung. Periksa internet Anda.';
-      // Normalisasi error agar mudah ditangani di UI
       const normalizedError = {
         ...error,
         isConnectivityError: true,
@@ -41,6 +41,12 @@ api.interceptors.response.use(
         message: userMessage,
       };
       return Promise.reject(normalizedError);
+    }
+
+    // For other errors (like CORS which also drops error.response), we want to let the app
+    // decide how to handle them, rather than masking them as an "internet connection" error.
+    if (!error?.response) {
+      console.error('[Axios] Missing response. Possible CORS issue or server crash.', error);
     }
 
     return Promise.reject(error);

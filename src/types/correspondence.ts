@@ -68,13 +68,19 @@ export const correspondenceService = {
     // --- ADMIN / MANAGER ONLY ---
     // Membalas surat dan mengubah status
     respond: async (id: number, payload: { status: string; response_text: string }) => {
-        const { data } = await axiosInstance.patch(`/correspondence/${id}/respond`, payload);
+        const { data } = await axiosInstance.post(`/correspondence/${id}/respond`, {
+            ...payload,
+            _method: 'PATCH',
+        });
         return data;
     },
 
     // Mengubah status tanpa balasan
     updateStatus: async (id: number, status: string) => {
-        const { data } = await axiosInstance.patch(`/correspondence/${id}/status`, { status });
+        const { data } = await axiosInstance.post(`/correspondence/${id}/status`, {
+            status,
+            _method: 'PATCH',
+        });
         return data;
     },
 

@@ -16,6 +16,9 @@ export function middleware(req) {
     '/kehadiran': ['mahasiswa', 'dosen'],
     '/kehadiran/[kode]/pertemuan': ['dosen'],
     '/notif': ['mahasiswa', 'dosen'],
+    '/persuratan/ajukan': ['mahasiswa', 'dosen'],
+    '/persuratan/status': ['mahasiswa', 'dosen'],
+    '/adminpage/persuratan': ['admin', 'manager'],
     '/profilpage': ['mahasiswa', 'dosen', 'admin', 'manager']
   };
 
