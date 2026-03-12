@@ -40,19 +40,41 @@ export function useAdminPersuratan() {
     const fetchData = useCallback(async () => {
         setIsLoading(true);
         setError(null);
-        try {
-            const [letters, cats] = await Promise.all([
-                correspondenceService.getAll(),
-                correspondenceService.getCategories(),
-            ]);
-            setAllData(letters || []);
-            setCategories(cats || []);
-        } catch (err) {
-            console.error('[useAdminPersuratan] Fetch error:', err);
-            setError(err?.response?.data?.message || err?.message || 'Gagal memuat data persuratan');
-        } finally {
-            setIsLoading(false);
+
+        const MAX_RETRIES = 2;
+        const RETRY_DELAY_MS = 3000;
+
+        for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+            try {
+                const [letters, cats] = await Promise.all([
+                    correspondenceService.getAll(),
+                    correspondenceService.getCategories(),
+                ]);
+                setAllData(letters || []);
+                setCategories(cats || []);
+                setIsLoading(false);
+                return;
+            } catch (err) {
+                const isLast = attempt === MAX_RETRIES;
+                const isConnectivity = err?.isConnectivityError || err?.code === 'ECONNABORTED';
+
+                if (!isLast && isConnectivity) {
+                    await new Promise((res) => setTimeout(res, RETRY_DELAY_MS));
+                    continue;
+                }
+
+                console.error('[useAdminPersuratan] Fetch error:', err);
+                setError(
+                    err?.userMessage ||
+                    err?.response?.data?.message ||
+                    err?.message ||
+                    'Gagal memuat data persuratan'
+                );
+                break;
+            }
         }
+
+        setIsLoading(false);
     }, []);
 
     useEffect(() => {

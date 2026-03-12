@@ -1,5 +1,7 @@
 'use client';
 
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Plus } from 'lucide-react';
 import AdminNavbar from '@/components/ui/admin-navbar';
@@ -49,6 +51,8 @@ export default function AdminPersuratanPage() {
 
         refetch,
     } = useAdminPersuratan();
+
+    const router = useRouter();
 
     return (
         <div className="min-h-screen flex flex-col">
@@ -130,6 +134,7 @@ export default function AdminPersuratanPage() {
                             <AdminSuratTable
                                 data={data}
                                 isLoading={isLoading}
+                                onDetail={(item) => router.push(`/adminpage/persuratan/${item.id_correspondence ?? item.id}`)}
                                 onEdit={(item) => openStatusModal(item)}
                                 onDelete={(item) => openDeleteModal(item)}
                                 searchQuery={searchQuery}

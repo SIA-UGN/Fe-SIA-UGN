@@ -38,8 +38,6 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3",
     "@tailwindcss/postcss": "^4",
-    "@types/node": "25.4.0",
-    "@types/react": "19.2.14",
     "autoprefixer": "^10.4.21",
     "cross-env": "^7.0.3",
     "eslint": "^9",

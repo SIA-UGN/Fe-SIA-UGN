@@ -21,6 +21,7 @@ const statusConfig = {
 export default function AdminSuratTable({
     data = [],
     isLoading = false,
+    onDetail,
     onEdit,
     onDelete,
     searchQuery = '',
@@ -107,7 +108,8 @@ export default function AdminSuratTable({
             <DataTable
                 columns={columns}
                 data={data}
-                actions={['edit', 'delete']}
+                actions={['detail', 'edit', 'delete']}
+                onDetail={(item) => onDetail?.(item)}
                 onEdit={(item) => onEdit?.(item)}
                 onDelete={(item) => onDelete?.(item)}
                 customRender={customRender}

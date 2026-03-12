@@ -28,7 +28,7 @@ export default function DeleteSuratModal({
 
     const handleConfirm = () => {
         if (surat && !isLoading) {
-            onConfirm(surat.id_correspondence);
+            onConfirm(surat.id_correspondence ?? surat.id);
         }
     };
 

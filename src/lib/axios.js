@@ -3,8 +3,7 @@ import Cookies from 'js-cookie';
 
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_BASE_URL, // dari .env.local
-  timeout: 10000, // 10 detik
-  // Pesan error default saat timeout
+  timeout: 30000, // 30 detik (Railway cold-boot bisa 15-25 s)
   timeoutErrorMessage: 'Tidak dapat terhubung. Periksa internet Anda.',
 });
 
@@ -33,7 +32,9 @@ api.interceptors.response.use(
 
     // If it's a true network error, simplify the message
     if (isTimeout || isNetworkError) {
-      const userMessage = 'Tidak dapat terhubung. Periksa internet Anda.';
+      const userMessage = isTimeout
+        ? 'Permintaan timeout. Server mungkin sedang booting, coba lagi dalam beberapa detik.'
+        : 'Tidak dapat terhubung. Periksa koneksi internet Anda.';
       const normalizedError = {
         ...error,
         isConnectivityError: true,

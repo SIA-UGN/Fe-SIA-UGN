@@ -32,7 +32,15 @@ export interface Correspondence {
     // Relasi (biasanya backend mengirim object nested)
     category?: Category;
     recipient?: Recipient;
-    user?: { name: string; email: string };
+    user?: { name: string; email: string; nim?: string; nip?: string };
+
+    // Flat sender fields — beberapa endpoint mengembalikan langsung di root
+    sender_name?:  string;
+    sender_email?: string;
+    sender_nim?:   string;
+    sender_nip?:   string;
+    user_name?:    string;   // alias umum
+    user_email?:   string;   // alias umum
 }
 
 export interface CorrespondencePayload {
