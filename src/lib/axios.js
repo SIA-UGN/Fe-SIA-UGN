@@ -1,14 +1,56 @@
 import axios from "axios";
 import Cookies from 'js-cookie';
 
+const resolveApiBaseUrl = () => {
+  const rawBaseUrl =
+    process.env.NEXT_PUBLIC_API_BASE_URL ||
+    process.env.NEXT_PUBLIC_API_URL ||
+    '';
+
+  return rawBaseUrl.replace(/\/+$/, '');
+};
+
+const getFirstValidationMessage = (errors) => {
+  if (!errors || typeof errors !== 'object') {
+    return null;
+  }
+
+  const firstKey = Object.keys(errors)[0];
+  if (!firstKey) {
+    return null;
+  }
+
+  const firstValue = errors[firstKey];
+  const firstMessage = Array.isArray(firstValue) ? firstValue[0] : firstValue;
+
+  if (!firstMessage) {
+    return null;
+  }
+
+  return `${firstKey}: ${firstMessage}`;
+};
+
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_BASE_URL, // dari .env.local
-  timeout: 30000, // 30 detik (Railway cold-boot bisa 15-25 s)
+  baseURL: resolveApiBaseUrl(),
+  timeout: 30000,
   timeoutErrorMessage: 'Tidak dapat terhubung. Periksa internet Anda.',
+  headers: {
+    Accept: 'application/json',
+  },
 });
 
 api.interceptors.request.use((config) => {
-  // Jangan kirim Authorization hanya untuk endpoint login
+  config.headers = config.headers ?? {};
+  config.headers.Accept = config.headers.Accept ?? 'application/json';
+
+  const method = String(config.method ?? 'get').toLowerCase();
+  const isFormData =
+    typeof FormData !== 'undefined' && config.data instanceof FormData;
+
+  if (!isFormData && !config.headers['Content-Type'] && method !== 'get' && method !== 'head' && method !== 'delete') {
+    config.headers['Content-Type'] = 'application/json';
+  }
+
   const url = config.url || '';
   const isLoginEndpoint = url.includes('/auth/login');
   if (!isLoginEndpoint) {
@@ -44,10 +86,20 @@ api.interceptors.response.use(
       return Promise.reject(normalizedError);
     }
 
-    // For other errors (like CORS which also drops error.response), we want to let the app
-    // decide how to handle them, rather than masking them as an "internet connection" error.
     if (!error?.response) {
       console.error('[Axios] Missing response. Possible CORS issue or server crash.', error);
+    }
+
+    const serverData = error?.response?.data;
+    const validationMessage = getFirstValidationMessage(serverData?.errors);
+    const serverMessage =
+      validationMessage ||
+      serverData?.message ||
+      serverData?.error;
+
+    if (serverMessage) {
+      error.message = serverMessage;
+      error.userMessage = serverMessage;
     }
 
     return Promise.reject(error);

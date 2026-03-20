@@ -90,6 +90,10 @@ export default function AkunManagerDashboard() {
     router.push('/adminpage/tambahakun/addform');
   };
 
+  const handleEditManager = (manager) => {
+    router.push(`/adminpage/tambahakun/editform?id=${manager.id_user_si || manager.id}`);
+  };
+
   // Handle search input change
   const handleSearchChange = (e) => {
     setSearchQuery(e.target.value);
@@ -233,8 +237,9 @@ export default function AkunManagerDashboard() {
           <DataTable
             columns={columns}
             data={filteredManagers}
-            actions={['activate']}
+            actions={['edit', 'activate']}
             pagination={true}
+            onEdit={handleEditManager}
             onActivate={handleActivate}
             customRender={customRender}
           />

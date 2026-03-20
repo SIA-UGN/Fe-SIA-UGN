@@ -4,122 +4,157 @@ import axiosInstance from '@/lib/axios';
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
 
-export type TAStatus = 'diproses' | 'ditolak' | 'approved';
+/** Status `student_thesis` */
+export type TAStudentStatus = 'proposing' | 'on_progress' | 'revision' | 'finished';
+
+/** Status `thesis_lecturer` (permintaan ke dosen) */
+export type TALecturerRequestStatus = 'pending' | 'accepted' | 'rejected';
 
 export interface Dosen {
-  id: number;
+  id_user_si: number;
   name: string;
-  nip: string;
+  username?: string;
+  email?: string;
+  staff_profile?: {
+    full_name?: string;
+    employee_id_number?: string;
+    position?: string;
+  };
 }
 
-export interface PengajuanTA {
-  id: number;
-  tanggal: string;          // ISO date string
-  judul: string;
-  dosen: string;             // Dosen name (display)
-  id_dosen?: number;
-  status: TAStatus;
-  ringkasan?: string;
-  attachment_url?: string;
+export interface ThesisLecturer {
+  id_thesis_lecturer: number;
+  id_student_thesis: number;
+  id_lecturer: number;
+  status: TALecturerRequestStatus;
+  student_note: string | null;
+  rejection_note: string | null;
+  created_at: string;
+  updated_at: string;
+  lecturer: { id_user_si: number; name: string; email?: string };
+}
+
+export interface ThesisSupervisor {
+  id_supervisor: number;
+  id_student_thesis: number;
+  id_lecturer: number;
+  created_at: string;
+  lecturer: { id_user_si: number; name: string; email?: string };
+  consultations?: Consultation[];
+}
+
+export interface Consultation {
+  id_consultation: number;
+  id_supervisor: number;
+  consultation_date: string;
+  subject: string;
+  student_notes: string | null;
+  lecturer_notes: string | null;
+  attachment: string | null;
+  status: 'pending' | 'on_going' | 'finished' | 'rejected';
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface StudentThesis {
+  id_student_thesis: number;
+  id_student: number;
+  id_program: number;
+  id_thesis_topic: number | null;
+  topic: string | null;
+  title_ind: string;
+  title_eng: string;
+  status: TAStudentStatus;
+  description: string;
+  attachment_proposal: string | null;
+  created_at: string;
+  updated_at: string;
+  thesis_lecturers?: ThesisLecturer[];
+  supervisors?: ThesisSupervisor[];
 }
 
 export interface CreateTAPayload {
-  judul: string;
-  ringkasan: string;
-  id_dosen: number;
-  file?: File | null;
+  title_ind: string;
+  title_eng: string;
+  description: string;
+  topic?: string;
+  attachment_proposal?: File | null;
+  /** ID dosen yang akan langsung dimintai bimbingan setelah submit */
+  id_lecturer: number;
+  student_note?: string;
 }
 
 /* ------------------------------------------------------------------ */
-/*  Service (placeholder — swap with real endpoints later)             */
+/*  Service                                                            */
 /* ------------------------------------------------------------------ */
 
 export const taService = {
   /**
-   * Fetch all TA submissions for the current student.
+   * GET /api/student/thesis
+   * Ambil data TA mahasiswa yang sedang login. Mengembalikan null jika belum ada.
    */
-  getAll: async (): Promise<PengajuanTA[]> => {
-    // TODO: replace with real endpoint
-    // const { data } = await axiosInstance.get<{ data: PengajuanTA[] }>('/ta/pengajuan');
-    // return data.data;
-
-    // ── Mock data ──────────────────────────────────────────────
-    return new Promise((resolve) =>
-      setTimeout(
-        () =>
-          resolve([
-            {
-              id: 1,
-              tanggal: '2025-06-10',
-              judul: 'Pengembangan Sistem Informasi Akademik Berbasis Web',
-              dosen: 'Dr. Ahmad Fauzi, M.Kom.',
-              status: 'approved',
-            },
-            {
-              id: 2,
-              tanggal: '2025-05-22',
-              judul: 'Analisis Sentimen Media Sosial Menggunakan NLP',
-              dosen: 'Prof. Siti Nurhaliza, Ph.D.',
-              status: 'diproses',
-            },
-            {
-              id: 3,
-              tanggal: '2025-04-15',
-              judul: 'Implementasi Machine Learning untuk Prediksi Cuaca',
-              dosen: 'Dr. Budi Santoso, M.T.',
-              status: 'ditolak',
-            },
-            {
-              id: 4,
-              tanggal: '2025-03-08',
-              judul: 'Rancang Bangun Aplikasi E-Commerce dengan Microservices',
-              dosen: 'Dr. Ahmad Fauzi, M.Kom.',
-              status: 'diproses',
-            },
-          ]),
-        800,
-      ),
-    );
+  getMyThesis: async (): Promise<StudentThesis | null> => {
+    const { data } = await axiosInstance.get<{
+      status: string;
+      data: StudentThesis | null;
+    }>('/api/student/thesis');
+    return data.data;
   },
 
   /**
-   * Create a new TA pengajuan (multipart for file upload).
+   * POST /api/student/thesis
+   * Buat pengajuan TA baru (mandiri). Mengembalikan StudentThesis yang baru dibuat.
    */
-  create: async (payload: CreateTAPayload) => {
-    // TODO: replace with real endpoint
-    // const formData = new FormData();
-    // formData.append('judul', payload.judul);
-    // formData.append('ringkasan', payload.ringkasan);
-    // formData.append('id_dosen', String(payload.id_dosen));
-    // if (payload.file) formData.append('file', payload.file);
-    // return axiosInstance.post('/ta/pengajuan', formData, {
-    //   headers: { 'Content-Type': 'multipart/form-data' },
-    // });
+  create: async (payload: Omit<CreateTAPayload, 'id_lecturer' | 'student_note'> & { attachment_proposal?: File | null }): Promise<StudentThesis> => {
+    const formData = new FormData();
+    formData.append('title_ind', payload.title_ind);
+    formData.append('title_eng', payload.title_eng);
+    formData.append('description', payload.description);
+    if (payload.topic) formData.append('topic', payload.topic);
+    if (payload.attachment_proposal) formData.append('attachment_proposal', payload.attachment_proposal);
 
-    return new Promise<{ success: boolean }>((resolve) =>
-      setTimeout(() => resolve({ success: true }), 1000),
+    const { data } = await axiosInstance.post<{ status: string; data: StudentThesis }>(
+      '/api/student/thesis',
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
     );
+    return data.data;
   },
 
   /**
-   * Fetch list of available dosen pembimbing.
+   * POST /api/student/thesis/{id}/request-lecturer
+   * Kirim permintaan bimbingan ke dosen setelah thesis dibuat.
+   */
+  requestLecturer: async (
+    thesisId: number,
+    payload: { id_lecturer: number; student_note?: string },
+  ): Promise<ThesisLecturer> => {
+    const { data } = await axiosInstance.post<{ status: string; data: ThesisLecturer }>(
+      `/api/student/thesis/${thesisId}/request-lecturer`,
+      { id_lecturer: payload.id_lecturer, student_note: payload.student_note ?? '' },
+    );
+    return data.data;
+  },
+
+  /**
+   * GET /api/student/thesis/lecturers
+   * Daftar dosen aktif yang bisa dipilih sebagai pembimbing.
    */
   getDosenList: async (): Promise<Dosen[]> => {
-    // TODO: replace with real endpoint
-    // const { data } = await axiosInstance.get<{ data: Dosen[] }>('/ta/dosen');
-    // return data.data;
-
-    return new Promise((resolve) =>
-      setTimeout(
-        () =>
-          resolve([
-            { id: 1, name: 'Dr. Ahmad Fauzi, M.Kom.', nip: '198501012010011001' },
-            { id: 2, name: 'Prof. Siti Nurhaliza, Ph.D.', nip: '197803152005012001' },
-            { id: 3, name: 'Dr. Budi Santoso, M.T.', nip: '198207202008011002' },
-            { id: 4, name: 'Dr. Rina Wulandari, M.Cs.', nip: '199001102015012001' },
-          ]),
-        500,
-      ),
+    const { data } = await axiosInstance.get<{ status: string; data: Dosen[] }>(
+      '/api/student/thesis/lecturers',
     );
+    return data.data;
+  },
+
+  /**
+   * GET /api/student/thesis/requests
+   * Riwayat seluruh permintaan pembimbing yang pernah dikirim.
+   */
+  getRequestHistory: async (): Promise<ThesisLecturer[]> => {
+    const { data } = await axiosInstance.get<{ status: string; data: ThesisLecturer[] }>(
+      '/api/student/thesis/requests',
+    );
+    return data.data;
   },
 };

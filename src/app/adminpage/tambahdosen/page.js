@@ -90,6 +90,10 @@ const handleAddDosen = () => {
 router.push('/adminpage/tambahdosen/addform');
 };
 
+const handleEditDosen = (dosen) => {
+  router.push(`/adminpage/tambahdosen/editform?id=${dosen.id_user_si || dosen.id}`);
+};
+
 // Handle search input change
 const handleSearchChange = (e) => {
   setSearchQuery(e.target.value);
@@ -230,8 +234,9 @@ return (
       <DataTable
         columns={columns}
         data={filteredDosens}
-        actions={['activate']}
+        actions={['edit', 'activate']}
         pagination={true}
+        onEdit={handleEditDosen}
         onActivate={handleActivate}
         customRender={customRender}
       />

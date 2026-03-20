@@ -3,10 +3,9 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Plus } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import AdminNavbar from '@/components/ui/admin-navbar';
 import Footer from '@/components/ui/footer';
-import { PrimaryButton } from '@/components/ui/button';
 import { ErrorMessageBoxWithButton } from '@/components/ui/message-box';
 import { SuccessMessageBox } from '@/components/ui/message-box';
 
@@ -87,12 +86,6 @@ export default function AdminPersuratanPage() {
                                     Kelola semua surat masuk dan perbarui statusnya
                                 </p>
                             </div>
-                            <Link href="/persuratan/ajukan">
-                                <PrimaryButton className="flex items-center gap-2">
-                                    <Plus size={18} />
-                                    Ajukan Surat
-                                </PrimaryButton>
-                            </Link>
                         </div>
 
                         {/* Success toast */}

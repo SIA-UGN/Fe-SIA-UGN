@@ -5,6 +5,105 @@ import api from './axios';
  * Semua endpoint khusus untuk Admin Dashboard
  */
 
+const FALLBACK_ROUTE_STATUSES = new Set([404, 405]);
+
+const extractValidationMessage = (payload) => {
+  if (!payload || typeof payload !== 'object' || !payload.errors || typeof payload.errors !== 'object') {
+    return null;
+  }
+
+  const firstField = Object.keys(payload.errors)[0];
+  if (!firstField) {
+    return null;
+  }
+
+  const firstValue = payload.errors[firstField];
+  const firstMessage = Array.isArray(firstValue) ? firstValue[0] : firstValue;
+
+  if (!firstMessage) {
+    return null;
+  }
+
+  return `${firstField}: ${firstMessage}`;
+};
+
+const normalizeApiError = (error, fallbackMessage) => {
+  const payload = error?.response?.data;
+  const message =
+    extractValidationMessage(payload) ||
+    payload?.message ||
+    payload?.error ||
+    error?.userMessage ||
+    error?.message ||
+    fallbackMessage;
+
+  if (payload && typeof payload === 'object') {
+    return { ...payload, message };
+  }
+
+  return { message, status: error?.response?.status };
+};
+
+const findEntityId = (item) =>
+  Number(
+    item?.id_user_si ??
+    item?.id_manager ??
+    item?.id_student ??
+    item?.id_lecturer ??
+    item?.id ??
+    0
+  );
+
+const buildUnsupportedUpdateError = (entityName, lastError) => ({
+  message: `Backend deployed belum menyediakan endpoint update ${entityName}.`,
+  status: lastError?.response?.status,
+});
+
+const requestCandidates = async (candidates, fallbackMessage, unsupportedMessage = fallbackMessage) => {
+  let lastError;
+
+  for (const candidate of candidates) {
+    try {
+      const response = await api.request(candidate);
+      return response.data;
+    } catch (error) {
+      lastError = error;
+      const status = error?.response?.status;
+
+      if (FALLBACK_ROUTE_STATUSES.has(status)) {
+        continue;
+      }
+
+      throw normalizeApiError(error, fallbackMessage);
+    }
+  }
+
+  throw normalizeApiError(lastError, unsupportedMessage);
+};
+
+const getEntityFromList = async ({ fetcher, id, entityName }) => {
+  try {
+    const response = await fetcher();
+
+    if (response?.status !== 'success' || !Array.isArray(response?.data)) {
+      throw { message: `Gagal mengambil data ${entityName}.` };
+    }
+
+    const selected = response.data.find((item) => String(findEntityId(item)) === String(id));
+
+    if (!selected) {
+      throw { message: `Data ${entityName} tidak ditemukan.` };
+    }
+
+    return {
+      status: 'success',
+      data: selected,
+    };
+  } catch (error) {
+    throw normalizeApiError(error, `Gagal mengambil data ${entityName}.`);
+  }
+};
+
 /**
  * Get dashboard statistics (Total Mata Kuliah, Mahasiswa, Dosen, Kelas)
  * @returns {Promise} Response dengan data statistik
@@ -40,7 +139,7 @@ export const getPrograms = async () => {
     const response = await api.get('/manager/programs');
     return response.data;
   } catch (error) {
-    throw (error.response?.data ?? error);
+    throw normalizeApiError(error, 'Gagal mengambil data program.');
   }
 };
 
@@ -53,7 +152,7 @@ export const getSubjects = async () => {
     const response = await api.get('/manager/subjects');
     return response.data;
   } catch (error) {
-    throw (error.response?.data ?? error);
+    throw normalizeApiError(error, 'Gagal mengambil data mata kuliah.');
   }
 };
 /**
@@ -66,7 +165,7 @@ export const storeSubject = async (subjectData) => {
     const response = await api.post('/manager/subjects', subjectData);
     return response.data;
   } catch (error) {
-    throw (error.response?.data ?? error);
+    throw normalizeApiError(error, 'Gagal menambahkan mata kuliah.');
   }
 };
 
@@ -80,7 +179,7 @@ export const getSubjectById = async (subjectId) => {
     const response = await api.get(`/manager/subjects/${subjectId}`);
     return response.data;
   } catch (error) {
-    throw (error.response?.data ?? error);
+    throw normalizeApiError(error, 'Gagal mengambil detail mata kuliah.');
   }
 };
 
@@ -95,7 +194,7 @@ export const updateSubject = async (subjectId, subjectData) => {
     const response = await api.put(`/manager/subjects/${subjectId}`, subjectData);
     return response.data;
   } catch (error) {
-    throw (error.response?.data ?? error);
+    throw normalizeApiError(error, 'Gagal memperbarui mata kuliah.');
   }
 };
 /**
@@ -108,7 +207,7 @@ export const deleteSubject = async (subjectId) => {
     const response = await api.delete(`/manager/subjects/${subjectId}`);
     return response.data;
   } catch (error) {
-    throw (error.response?.data ?? error);
+    throw normalizeApiError(error, 'Gagal menghapus mata kuliah.');
   }
 };
 
@@ -121,7 +220,7 @@ export const getClasses = async () => {
     const response = await api.get('/manager/classes');
     return response.data;
   } catch (error) {
-    throw (error.response?.data ?? error);
+    throw normalizeApiError(error, 'Gagal mengambil data kelas.');
   }
 };
 
@@ -135,7 +234,7 @@ export const storeClass = async (classData) => {
     const response = await api.post('/manager/classes', classData);
     return response.data;
   } catch (error) {
-    throw (error.response?.data ?? error);
+    throw normalizeApiError(error, 'Gagal menambahkan kelas.');
   }
 };
 
@@ -149,7 +248,7 @@ export const getClassById = async (classId) => {
     const response = await api.get(`/manager/classes/${classId}`);
     return response.data;
   } catch (error) {
-    throw (error.response?.data ?? error);
+    throw normalizeApiError(error, 'Gagal mengambil detail kelas.');
   }
 };
 
@@ -164,7 +263,7 @@ export const updateClass = async (classId, classData) => {
     const response = await api.put(`/manager/classes/${classId}`, classData);
     return response.data;
   } catch (error) {
-    throw (error.response?.data ?? error);
+    throw normalizeApiError(error, 'Gagal memperbarui kelas.');
   }
 };
 
@@ -179,7 +278,7 @@ export const assignLecturersToClass = async (classId, lecturerIds) => {
     const response = await api.post(`/manager/classes/${classId}/lecturers`, lecturerIds);
     return response.data;
   } catch (error) {
-    throw (error.response?.data ?? error);
+    throw normalizeApiError(error, 'Gagal menambahkan dosen ke kelas.');
   }
 };
 
@@ -194,7 +293,7 @@ export const assignStudentsToClass = async (classId, studentIds) => {
     const response = await api.post(`/manager/classes/${classId}/students`, studentIds);
     return response.data;
   } catch (error) {
-    throw (error.response?.data ?? error);
+    throw normalizeApiError(error, 'Gagal menambahkan mahasiswa ke kelas.');
   }
 };
 
@@ -209,7 +308,7 @@ export const removeLecturerFromClass = async (classId, lecturerId) => {
     const response = await api.delete(`/manager/classes/${classId}/lecturers/${lecturerId}`);
     return response.data;
   } catch (error) {
-    throw (error.response?.data ?? error);
+    throw normalizeApiError(error, 'Gagal menghapus dosen dari kelas.');
   }
 };
 
@@ -224,7 +323,7 @@ export const removeStudentFromClass = async (classId, studentId) => {
     const response = await api.delete(`/manager/classes/${classId}/students/${studentId}`);
     return response.data;
   } catch (error) {
-    throw (error.response?.data ?? error);
+    throw normalizeApiError(error, 'Gagal menghapus mahasiswa dari kelas.');
   }
 };
 
@@ -239,7 +338,7 @@ export const generateSchedule = async (classId, scheduleData) => {
     const response = await api.post(`/manager/classes/${classId}/generate-schedule`, scheduleData);
     return response.data;
   } catch (error) {
-    throw (error.response?.data ?? error);
+    throw normalizeApiError(error, 'Gagal membuat jadwal kelas.');
   }
 };
 
@@ -252,7 +351,38 @@ export const getManagers = async () => {
     const response = await api.get('/admin/managers');
     return response.data;
   } catch (error) {
-    throw (error.response?.data ?? error);
+    throw normalizeApiError(error, 'Gagal mengambil data manager.');
+  }
+};
+
+export const getManagerById = async (managerId) =>
+  getEntityFromList({
+    fetcher: getManagers,
+    id: managerId,
+    entityName: 'manager',
+  });
+
+export const updateManager = async (managerId, managerData) => {
+  try {
+    return await requestCandidates(
+      [
+        { method: 'put', url: `/admin/managers/${managerId}`, data: managerData },
+        { method: 'patch', url: `/admin/managers/${managerId}`, data: managerData },
+        {
+          method: 'post',
+          url: `/admin/managers/${managerId}`,
+          data: { ...managerData, _method: 'PUT' },
+        },
+      ],
+      'Gagal memperbarui data manager.',
+      'Backend deployed belum menyediakan endpoint update manager.',
+    );
+  } catch (error) {
+    if (error?.status && FALLBACK_ROUTE_STATUSES.has(error.status)) {
+      throw buildUnsupportedUpdateError('manager', error);
+    }
+
+    throw error;
   }
 };
 
@@ -266,7 +396,7 @@ export const storeManager = async (managerData) => {
     const response = await api.post('/admin/managers', managerData);
     return response.data;
   } catch (error) {
-    throw (error.response?.data ?? error);
+    throw normalizeApiError(error, 'Gagal menambahkan manager.');
   }
 };
 
@@ -280,7 +410,7 @@ export const deleteManager = async (managerId) => {
     const response = await api.delete(`/admin/managers/${managerId}`);
     return response.data;
   } catch (error) {
-    throw (error.response?.data ?? error);
+    throw normalizeApiError(error, 'Gagal menghapus manager.');
   }
 };
 /**
@@ -289,12 +419,46 @@ export const deleteManager = async (managerId) => {
  */
 export const getDosen = async () => {
   try {
-    const response = await api.get('/manager/users-by-role', {
-      params: { role: 'dosen' }
-    });
-    return response.data;
+    return await requestCandidates(
+      [
+        { method: 'get', url: '/manager/lecturers' },
+        { method: 'get', url: '/manager/users-by-role', params: { role: 'dosen' } },
+      ],
+      'Gagal mengambil data dosen.',
+    );
   } catch (error) {
-    throw (error.response?.data ?? error);
+    throw normalizeApiError(error, 'Gagal mengambil data dosen.');
+  }
+};
+
+export const getDosenById = async (dosenId) =>
+  getEntityFromList({
+    fetcher: getDosen,
+    id: dosenId,
+    entityName: 'dosen',
+  });
+
+export const updateDosen = async (dosenId, dosenData) => {
+  try {
+    return await requestCandidates(
+      [
+        { method: 'put', url: `/manager/lecturers/${dosenId}`, data: dosenData },
+        { method: 'patch', url: `/manager/lecturers/${dosenId}`, data: dosenData },
+        {
+          method: 'post',
+          url: `/manager/lecturers/${dosenId}`,
+          data: { ...dosenData, _method: 'PUT' },
+        },
+      ],
+      'Gagal memperbarui data dosen.',
+      'Backend deployed belum menyediakan endpoint update dosen.',
+    );
+  } catch (error) {
+    if (error?.status && FALLBACK_ROUTE_STATUSES.has(error.status)) {
+      throw buildUnsupportedUpdateError('dosen', error);
+    }
+
+    throw error;
   }
 };
 /**
@@ -307,7 +471,7 @@ export const storeDosen = async (dosenData) => {
     const response = await api.post('/manager/lecturers', dosenData);
     return response.data;
   } catch (error) {
-    throw (error.response?.data ?? error);
+    throw normalizeApiError(error, 'Gagal menambahkan dosen.');
   }
 };
 
@@ -317,12 +481,46 @@ export const storeDosen = async (dosenData) => {
  */
 export const getMahasiswa = async () => {
   try {
-    const response = await api.get('/manager/users-by-role', {
-      params: { role: 'mahasiswa' }
-    });
-    return response.data;
+    return await requestCandidates(
+      [
+        { method: 'get', url: '/manager/students' },
+        { method: 'get', url: '/manager/users-by-role', params: { role: 'mahasiswa' } },
+      ],
+      'Gagal mengambil data mahasiswa.',
+    );
   } catch (error) {
-    throw (error.response?.data ?? error);
+    throw normalizeApiError(error, 'Gagal mengambil data mahasiswa.');
+  }
+};
+
+export const getMahasiswaById = async (studentId) =>
+  getEntityFromList({
+    fetcher: getMahasiswa,
+    id: studentId,
+    entityName: 'mahasiswa',
+  });
+
+export const updateMahasiswa = async (studentId, mahasiswaData) => {
+  try {
+    return await requestCandidates(
+      [
+        { method: 'put', url: `/manager/students/${studentId}`, data: mahasiswaData },
+        { method: 'patch', url: `/manager/students/${studentId}`, data: mahasiswaData },
+        {
+          method: 'post',
+          url: `/manager/students/${studentId}`,
+          data: { ...mahasiswaData, _method: 'PUT' },
+        },
+      ],
+      'Gagal memperbarui data mahasiswa.',
+      'Backend deployed belum menyediakan endpoint update mahasiswa.',
+    );
+  } catch (error) {
+    if (error?.status && FALLBACK_ROUTE_STATUSES.has(error.status)) {
+      throw buildUnsupportedUpdateError('mahasiswa', error);
+    }
+
+    throw error;
   }
 };
 /**
@@ -335,7 +533,7 @@ export const storeMahasiswa = async (mahasiswaData) => {
     const response = await api.post('/manager/students', mahasiswaData);
     return response.data;
   } catch (error) {
-    throw (error.response?.data ?? error);
+    throw normalizeApiError(error, 'Gagal menambahkan mahasiswa.');
   }
 };
 
@@ -351,7 +549,7 @@ export const toggleUserStatus = async (userId) => {
     return response.data;
   } catch (error) {
     console.error("Error toggling user status:", error);
-    throw (error.response?.data ?? error);
+    throw normalizeApiError(error, 'Gagal mengubah status user.');
   }
 };
 
@@ -367,7 +565,16 @@ export const toggleManagerStatus = async (managerId) => {
     return response.data;
   } catch (error) {
     console.error("Error toggling manager status:", error);
-    throw (error.response?.data ?? error);
+    throw normalizeApiError(error, 'Gagal mengubah status manager.');
+  }
+};
+
+export const toggleClassStatus = async (classId) => {
+  try {
+    const response = await api.patch(`/manager/classes/${classId}/toggle-status`);
+    return response.data;
+  } catch (error) {
+    throw normalizeApiError(error, 'Gagal mengubah status kelas.');
   }
 };
 
@@ -380,7 +587,7 @@ export const getAcademicPeriods = async () => {
     const response = await api.get('/academic-periods');
     return response.data;
   } catch (error) {
-    throw (error.response?.data ?? error);
+    throw normalizeApiError(error, 'Gagal mengambil data periode akademik.');
   }
 };
 
@@ -394,7 +601,7 @@ export const storeAcademicPeriod = async (periodData) => {
     const response = await api.post('/academic-periods', periodData);
     return response.data;
   } catch (error) {
-    throw (error.response?.data ?? error);
+    throw normalizeApiError(error, 'Gagal menambahkan periode akademik.');
   }
 };
 
@@ -408,7 +615,7 @@ export const deleteAcademicPeriod = async (periodId) => {
     const response = await api.delete(`/academic-periods/${periodId}`);
     return response.data;
   } catch (error) {
-    throw (error.response?.data ?? error);
+    throw normalizeApiError(error, 'Gagal menghapus periode akademik.');
   }
 };
 
@@ -422,7 +629,7 @@ export const getAcademicPeriodById = async (periodId) => {
     const response = await api.get(`/academic-periods/${periodId}`);
     return response.data;
   } catch (error) {
-    throw (error.response?.data ?? error);
+    throw normalizeApiError(error, 'Gagal mengambil detail periode akademik.');
   }
 };
 
@@ -436,7 +643,7 @@ export const updateAcademicPeriod = async (periodId, periodData) => {
     const response = await api.put(`/academic-periods/${periodId}`, periodData);
     return response.data;
   } catch (error) {
-    throw (error.response?.data ?? error);
+    throw normalizeApiError(error, 'Gagal memperbarui periode akademik.');
   }
 };
 
@@ -451,16 +658,18 @@ export const toggleAcademicPeriodStatus = async (periodId, data) => {
     const response = await api.put(`/academic-periods/${periodId}/toggle-status`, data);
     return response.data;
   } catch (error) {
-    throw (error.response?.data ?? error);
+    throw normalizeApiError(error, 'Gagal mengubah status periode akademik.');
   }
 };
 
-export default {
+const adminApi = {
   getDashboardStatistics,
   getDetailedStatistics,
   getPrograms,
   getManagers,
+  getManagerById,
   storeManager,
+  updateManager,
   deleteManager,
   getSubjects,
   storeSubject,
@@ -468,10 +677,15 @@ export default {
   updateSubject,
   deleteSubject,
   getClasses,
+  toggleClassStatus,
   getDosen,
+  getDosenById,
   storeDosen,
+  updateDosen,
   getMahasiswa,
+  getMahasiswaById,
   storeMahasiswa,
+  updateMahasiswa,
   toggleUserStatus,
   toggleManagerStatus,
   storeClass,
@@ -489,3 +703,5 @@ export default {
   updateAcademicPeriod,
   toggleAcademicPeriodStatus,
 };
+
+export default adminApi;

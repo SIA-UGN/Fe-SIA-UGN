@@ -1,413 +1,405 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useCallback, useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { 
-  Field, 
-  FieldLabel, 
-  FieldDescription, 
-  FieldError, 
-  FieldContent 
+import {
+  Field,
+  FieldLabel,
+  FieldDescription,
+  FieldError,
+  FieldContent,
 } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
 import AdminNavbar from "@/components/ui/admin-navbar";
-import { ArrowLeft, Save, X, Info } from "lucide-react";
 import LoadingEffect from "@/components/ui/loading-effect";
+import {
+  ErrorMessageBox,
+  ErrorMessageBoxWithButton,
+  SuccessMessageBoxWithButton,
+} from "@/components/ui/message-box";
+import { AlertConfirmationRedDialog } from "@/components/ui/alert-dialog";
+import { ArrowLeft, Info, Save, X } from "lucide-react";
+import { getManagerById, updateManager } from "@/lib/adminApi";
+
+const initialFormData = {
+  name: "",
+  username: "",
+  email: "",
+  password: "",
+  confirmPassword: "",
+  is_active: true,
+};
 
 function EditManagerForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const managerId = searchParams.get('id');
-  
-  const [isLoading, setIsLoading] = useState(false);
-  const [isFetching, setIsFetching] = useState(true);
+  const managerId = searchParams.get("id");
+
+  const [formData, setFormData] = useState(initialFormData);
   const [errors, setErrors] = useState({});
-  
-  const [formData, setFormData] = useState({
-    username: "",
-    email: "",
-    password: "",
-    confirmPassword: "",
-    is_active: true
-  });
+  const [isFetching, setIsFetching] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const [success, setSuccess] = useState(null);
+  const [countdown, setCountdown] = useState(5);
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
 
-  // Fetch data manager saat component mount
-  useEffect(() => {
-    if (managerId) {
-      fetchManagerData();
+  const fetchManagerData = useCallback(async () => {
+    if (!managerId) {
+      setErrors({ fetch: "ID manager tidak valid." });
+      setIsFetching(false);
+      return;
     }
-  }, [managerId]);
 
-  const fetchManagerData = async () => {
+    setIsFetching(true);
     try {
-      setIsFetching(true);
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-      // TODO: Replace with actual API call
-      // const response = await fetch(`/api/manager/${managerId}`, {
-      //   headers: {
-      //     'Authorization': `Bearer ${localStorage.getItem('token')}`
-      //   }
-      // });
-      // const data = await response.json();
-      
-      // Dummy data untuk demo
-      const dummyData = {
-        username: "manager_john",
-        email: "john.manager@example.com",
-        is_active: true
-      };
-      
-      setFormData({
-        ...formData,
-        ...dummyData,
-        password: "",
-        confirmPassword: ""
-      });
+      const response = await getManagerById(managerId);
+
+      if (response.status === "success") {
+        setFormData({
+          name: response.data.name ?? "",
+          username: response.data.username ?? "",
+          email: response.data.email ?? "",
+          password: "",
+          confirmPassword: "",
+          is_active: Boolean(response.data.is_active),
+        });
+        setErrors({});
+      } else {
+        setErrors({ fetch: response.message || "Gagal memuat data manager." });
+      }
     } catch (error) {
-      alert("Gagal mengambil data manager: " + error.message);
-      router.push("/adminpage/tambahakun");
+      setErrors({ fetch: error.message || "Gagal memuat data manager." });
     } finally {
       setIsFetching(false);
     }
-  };
+  }, [managerId]);
 
-  const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setFormData(prev => ({
+  useEffect(() => {
+    fetchManagerData();
+  }, [fetchManagerData]);
+
+  useEffect(() => {
+    if (!success) {
+      return undefined;
+    }
+
+    if (countdown <= 0) {
+      router.push("/adminpage/tambahakun");
+      return undefined;
+    }
+
+    const timer = setTimeout(() => setCountdown((prev) => prev - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [success, countdown, router]);
+
+  const handleChange = (event) => {
+    const { name, value, type, checked } = event.target;
+
+    setFormData((prev) => ({
       ...prev,
-      [name]: type === "checkbox" ? checked : value
+      [name]: type === "checkbox" ? checked : value,
     }));
-    
-    // Clear error when user starts typing
-    if (errors[name]) {
-      setErrors(prev => ({ ...prev, [name]: null }));
+
+    if (errors[name] || errors.form) {
+      setErrors((prev) => ({
+        ...prev,
+        [name]: null,
+        form: null,
+      }));
+    }
+
+    if (success) {
+      setSuccess(null);
+      setCountdown(5);
     }
   };
 
   const validateForm = () => {
-    const newErrors = {};
-    
+    const nextErrors = {};
+
+    if (!formData.name.trim()) {
+      nextErrors.name = "Nama manager harus diisi";
+    } else if (formData.name.trim().length < 3) {
+      nextErrors.name = "Nama manager minimal 3 karakter";
+    }
+
     if (!formData.username.trim()) {
-      newErrors.username = "Username harus diisi";
-    } else if (formData.username.length < 3) {
-      newErrors.username = "Username minimal 3 karakter";
+      nextErrors.username = "Username harus diisi";
+    } else if (formData.username.trim().length < 3) {
+      nextErrors.username = "Username minimal 3 karakter";
     }
-    
+
     if (!formData.email.trim()) {
-      newErrors.email = "Email harus diisi";
+      nextErrors.email = "Email harus diisi";
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = "Format email tidak valid";
+      nextErrors.email = "Format email tidak valid";
     }
-    
-    // Password opsional saat edit (hanya validasi jika diisi)
-    if (formData.password) {
-      if (formData.password.length < 6) {
-        newErrors.password = "Password minimal 6 karakter";
-      }
-      
-      if (formData.password !== formData.confirmPassword) {
-        newErrors.confirmPassword = "Password tidak sama";
-      }
+
+    if (formData.password && formData.password.length < 6) {
+      nextErrors.password = "Password minimal 6 karakter";
     }
-    
-    setErrors(prev => ({...prev, ...newErrors}));
-    return Object.keys(newErrors).length === 0;
+
+    if (formData.password && formData.password !== formData.confirmPassword) {
+      nextErrors.confirmPassword = "Konfirmasi password tidak sama";
+    }
+
+    setErrors((prev) => ({ ...prev, ...nextErrors }));
+    return Object.keys(nextErrors).length === 0;
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+
     if (!validateForm()) {
       return;
     }
-    
+
     setIsLoading(true);
-    
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // TODO: Replace with actual API call
-      // const updateData = {
-      //   username: formData.username,
-      //   email: formData.email,
-      //   is_active: formData.is_active
-      // };
-      
-      // // Hanya sertakan password jika diisi
-      // if (formData.password) {
-      //   updateData.password = formData.password;
-      // }
-      
-      // const response = await fetch(`/api/manager/${managerId}`, {
-      //   method: 'PUT',
-      //   headers: {
-      //     'Content-Type': 'application/json',
-      //     'Authorization': `Bearer ${localStorage.getItem('token')}`
-      //   },
-      //   body: JSON.stringify(updateData)
-      // });
-      
-      // if (!response.ok) throw new Error('Gagal mengupdate data');
-      
-      alert("Akun manager berhasil diperbarui!");
-      router.push("/adminpage/tambahakun");
+      const payload = {
+        name: formData.name.trim(),
+        username: formData.username.trim(),
+        email: formData.email.trim(),
+        is_active: formData.is_active,
+      };
+
+      if (formData.password) {
+        payload.password = formData.password;
+        payload.password_confirmation = formData.confirmPassword;
+      }
+
+      const response = await updateManager(managerId, payload);
+
+      if (response.status === "success") {
+        setSuccess("Data manager berhasil diperbarui.");
+        setCountdown(5);
+        setErrors({});
+      } else {
+        setErrors({ form: response.message || "Gagal memperbarui data manager." });
+      }
     } catch (error) {
-      alert("Gagal mengupdate data: " + error.message);
+      setErrors({ form: error.message || "Gagal memperbarui data manager." });
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleCancel = () => {
-    if (window.confirm("Apakah Anda yakin ingin membatalkan? Perubahan tidak akan disimpan.")) {
-      router.push("/adminpage/tambahakun");
-    }
+  const handleFinish = () => {
+    router.push("/adminpage/tambahakun");
   };
 
   if (isFetching) {
+    return <LoadingEffect message="Memuat data manager..." />;
+  }
+
+  if (errors.fetch) {
     return (
-      <LoadingEffect/>
+      <div className="min-h-screen bg-brand-light-sage">
+        <AdminNavbar title="Dashboard Admin - Edit Akun Manager" />
+        <div className="container mx-auto max-w-5xl px-4 py-8">
+          <ErrorMessageBoxWithButton
+            message={errors.fetch}
+            action={fetchManagerData}
+            back={true}
+            actionback={handleFinish}
+          />
+        </div>
+      </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-brand-light-sage">
       <AdminNavbar title="Dashboard Admin - Edit Akun Manager" />
-      
-      <div className="container mx-auto px-4 py-8 max-w-5xl">
-        {/* Header */}
+
+      <div className="container mx-auto max-w-5xl px-4 py-8">
         <div className="mb-10">
           <Button
             variant="ghost"
-            onClick={() => router.push("/adminpage/tambahakun")}
+            onClick={() => setShowCancelDialog(true)}
             className="mb-6 -ml-4"
-            style={{ fontFamily: 'Urbanist, sans-serif' }}
+            style={{ fontFamily: "Urbanist, sans-serif" }}
           >
-            <ArrowLeft className="w-5 h-5 mr-2" />
+            <ArrowLeft className="mr-2 h-5 w-5" />
             Kembali
           </Button>
-          
-          <div className="flex items-center gap-4 mb-4">
-            <div 
-              className="w-2 h-16 rounded-full"
-              style={{ backgroundColor: '#015023' }}
+
+          <div className="mb-4 flex items-center gap-4">
+            <div
+              className="h-16 w-2 rounded-full"
+              style={{ backgroundColor: "#015023" }}
             />
             <div>
-              <h1 
-                className="text-4xl font-bold mb-2"
-                style={{ 
-                  fontFamily: 'Urbanist, sans-serif',
-                  color: '#015023'
+              <h1
+                className="mb-2 text-4xl font-bold"
+                style={{
+                  fontFamily: "Urbanist, sans-serif",
+                  color: "#015023",
                 }}
               >
                 Edit Akun Manager
               </h1>
-              <p 
+              <p
                 className="text-lg text-gray-600"
-                style={{ fontFamily: 'Urbanist, sans-serif' }}
+                style={{ fontFamily: "Urbanist, sans-serif" }}
               >
-                Perbarui informasi akun manager di bawah ini
+                Data akun diambil dari backend yang sedang aktif.
               </p>
             </div>
           </div>
         </div>
 
-        {/* Form */}
-        <div 
-          className="bg-white border-2 p-8 md:p-10 shadow-lg"
-          style={{ 
-            borderColor: '#015023',
-            borderRadius: '12px'
+        <div
+          className="border-2 bg-white p-8 shadow-lg md:p-10"
+          style={{
+            borderColor: "#015023",
+            borderRadius: "12px",
           }}
         >
           <div className="mb-8">
-            <h2 
-              className="text-2xl font-bold mb-2"
-              style={{ 
-                fontFamily: 'Urbanist, sans-serif',
-                color: '#015023'
+            <h2
+              className="mb-2 text-2xl font-bold"
+              style={{
+                fontFamily: "Urbanist, sans-serif",
+                color: "#015023",
               }}
             >
               Informasi Akun
             </h2>
-            <div 
-              className="w-20 h-1 rounded-full"
-              style={{ backgroundColor: '#DABC4E' }}
+            <div
+              className="h-1 w-20 rounded-full"
+              style={{ backgroundColor: "#DABC4E" }}
             />
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-8">
-            {/* Username Field */}
+            <Field>
+              <FieldLabel htmlFor="name">
+                Nama <span className="text-red-500">*</span>
+              </FieldLabel>
+              <FieldDescription>Nama lengkap manager</FieldDescription>
+              <FieldContent>
+                <input
+                  id="name"
+                  name="name"
+                  type="text"
+                  value={formData.name}
+                  onChange={handleChange}
+                  disabled={isLoading}
+                  className="w-full rounded-[12px] border-2 px-4 py-3.5 focus:outline-none"
+                  style={{
+                    fontFamily: "Urbanist, sans-serif",
+                    borderColor: errors.name ? "#BE0414" : "#015023",
+                    opacity: errors.name ? 1 : 0.7,
+                  }}
+                />
+              </FieldContent>
+              {errors.name && <FieldError>{errors.name}</FieldError>}
+            </Field>
+
             <Field>
               <FieldLabel htmlFor="username">
                 Username <span className="text-red-500">*</span>
               </FieldLabel>
-              <FieldDescription>
-                Username yang digunakan untuk login sebagai manager
-              </FieldDescription>
+              <FieldDescription>Username untuk login manager</FieldDescription>
               <FieldContent>
-                <div className="relative">
-                  <input
-                    type="text"
-                    id="username"
-                    name="username"
-                    value={formData.username}
-                    onChange={handleChange}
-                    className="w-full px-4 py-3.5 border-2 focus:outline-none focus:border-opacity-100"
-                    style={{
-                      fontFamily: 'Urbanist, sans-serif',
-                      borderColor: errors.username ? '#BE0414' : '#015023',
-                      borderRadius: '12px',
-                      opacity: errors.username ? 1 : 0.7
-                    }}
-                    placeholder="Masukkan username"
-                    disabled={isLoading}
-                  />
-                  {formData.username && !errors.username && formData.username.length >= 3 && (
-                    <div 
-                      className="absolute right-4 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold"
-                      style={{ backgroundColor: '#16874B' }}
-                    >
-                      ✓
-                    </div>
-                  )}
-                </div>
+                <input
+                  id="username"
+                  name="username"
+                  type="text"
+                  value={formData.username}
+                  onChange={handleChange}
+                  disabled={isLoading}
+                  className="w-full rounded-[12px] border-2 px-4 py-3.5 focus:outline-none"
+                  style={{
+                    fontFamily: "Urbanist, sans-serif",
+                    borderColor: errors.username ? "#BE0414" : "#015023",
+                    opacity: errors.username ? 1 : 0.7,
+                  }}
+                />
               </FieldContent>
-              {errors.username && (
-                <FieldError>{errors.username}</FieldError>
-              )}
+              {errors.username && <FieldError>{errors.username}</FieldError>}
             </Field>
 
-            {/* Email Field */}
             <Field>
               <FieldLabel htmlFor="email">
                 Email <span className="text-red-500">*</span>
               </FieldLabel>
-              <FieldDescription>
-                Alamat email yang valid untuk komunikasi
-              </FieldDescription>
+              <FieldDescription>Email aktif untuk akun manager</FieldDescription>
               <FieldContent>
-                <div className="relative">
-                  <input
-                    type="email"
-                    id="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleChange}
-                    className="w-full px-4 py-3.5 border-2 focus:outline-none focus:border-opacity-100"
-                    style={{
-                      fontFamily: 'Urbanist, sans-serif',
-                      borderColor: errors.email ? '#BE0414' : '#015023',
-                      borderRadius: '12px',
-                      opacity: errors.email ? 1 : 0.7
-                    }}
-                    placeholder="contoh@email.com"
-                    disabled={isLoading}
-                  />
-                  {formData.email && !errors.email && /\S+@\S+\.\S+/.test(formData.email) && (
-                    <div 
-                      className="absolute right-4 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold"
-                      style={{ backgroundColor: '#16874B' }}
-                    >
-                      ✓
-                    </div>
-                  )}
-                </div>
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  disabled={isLoading}
+                  className="w-full rounded-[12px] border-2 px-4 py-3.5 focus:outline-none"
+                  style={{
+                    fontFamily: "Urbanist, sans-serif",
+                    borderColor: errors.email ? "#BE0414" : "#015023",
+                    opacity: errors.email ? 1 : 0.7,
+                  }}
+                />
               </FieldContent>
-              {errors.email && (
-                <FieldError>{errors.email}</FieldError>
-              )}
+              {errors.email && <FieldError>{errors.email}</FieldError>}
             </Field>
 
-            {/* Separator */}
-            <div 
-              className="w-full h-px my-8"
-              style={{ 
-                background: 'linear-gradient(to right, transparent, #DABC4E, transparent)'
+            <div
+              className="my-8 h-px w-full"
+              style={{
+                background:
+                  "linear-gradient(to right, transparent, #DABC4E, transparent)",
               }}
             />
 
-            {/* Password Field */}
             <Field>
-              <FieldLabel htmlFor="password">
-                Password Baru (Opsional)
-              </FieldLabel>
+              <FieldLabel htmlFor="password">Password Baru</FieldLabel>
               <FieldDescription>
-                Kosongkan jika tidak ingin mengubah password. Minimal 6 karakter jika diisi.
+                Kosongkan jika tidak ingin mengubah password.
               </FieldDescription>
               <FieldContent>
-                <div className="relative">
-                  <input
-                    type="password"
-                    id="password"
-                    name="password"
-                    value={formData.password}
-                    onChange={handleChange}
-                    className="w-full px-4 py-3.5 border-2 focus:outline-none focus:border-opacity-100"
-                    style={{
-                      fontFamily: 'Urbanist, sans-serif',
-                      borderColor: errors.password ? '#BE0414' : '#015023',
-                      borderRadius: '12px',
-                      opacity: errors.password ? 1 : 0.7
-                    }}
-                    placeholder="Masukkan password baru"
-                    disabled={isLoading}
-                  />
-                  {formData.password && !errors.password && formData.password.length >= 6 && (
-                    <div 
-                      className="absolute right-4 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold"
-                      style={{ backgroundColor: '#16874B' }}
-                    >
-                      ✓
-                    </div>
-                  )}
-                </div>
+                <input
+                  id="password"
+                  name="password"
+                  type="password"
+                  value={formData.password}
+                  onChange={handleChange}
+                  disabled={isLoading}
+                  className="w-full rounded-[12px] border-2 px-4 py-3.5 focus:outline-none"
+                  style={{
+                    fontFamily: "Urbanist, sans-serif",
+                    borderColor: errors.password ? "#BE0414" : "#015023",
+                    opacity: errors.password ? 1 : 0.7,
+                  }}
+                />
               </FieldContent>
-              {errors.password && (
-                <FieldError>{errors.password}</FieldError>
-              )}
+              {errors.password && <FieldError>{errors.password}</FieldError>}
             </Field>
 
-            {/* Confirm Password Field - hanya muncul jika password diisi */}
             {formData.password && (
               <Field>
                 <FieldLabel htmlFor="confirmPassword">
                   Konfirmasi Password Baru
                 </FieldLabel>
                 <FieldDescription>
-                  Ulangi password baru untuk konfirmasi
+                  Ulangi password baru untuk konfirmasi.
                 </FieldDescription>
                 <FieldContent>
-                  <div className="relative">
-                    <input
-                      type="password"
-                      id="confirmPassword"
-                      name="confirmPassword"
-                      value={formData.confirmPassword}
-                      onChange={handleChange}
-                      className="w-full px-4 py-3.5 border-2 focus:outline-none focus:border-opacity-100"
-                      style={{
-                        fontFamily: 'Urbanist, sans-serif',
-                        borderColor: errors.confirmPassword ? '#BE0414' : '#015023',
-                        borderRadius: '12px',
-                        opacity: errors.confirmPassword ? 1 : 0.7
-                      }}
-                      placeholder="Ulangi password baru"
-                      disabled={isLoading}
-                    />
-                    {formData.confirmPassword && !errors.confirmPassword && formData.password === formData.confirmPassword && (
-                      <div 
-                        className="absolute right-4 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold"
-                        style={{ backgroundColor: '#16874B' }}
-                      >
-                        ✓
-                      </div>
-                    )}
-                  </div>
+                  <input
+                    id="confirmPassword"
+                    name="confirmPassword"
+                    type="password"
+                    value={formData.confirmPassword}
+                    onChange={handleChange}
+                    disabled={isLoading}
+                    className="w-full rounded-[12px] border-2 px-4 py-3.5 focus:outline-none"
+                    style={{
+                      fontFamily: "Urbanist, sans-serif",
+                      borderColor: errors.confirmPassword ? "#BE0414" : "#015023",
+                      opacity: errors.confirmPassword ? 1 : 0.7,
+                    }}
+                  />
                 </FieldContent>
                 {errors.confirmPassword && (
                   <FieldError>{errors.confirmPassword}</FieldError>
@@ -415,89 +407,80 @@ function EditManagerForm() {
               </Field>
             )}
 
-            {/* Is Active Field */}
             <Field>
-              <div 
-                className="flex items-center gap-4 p-5 border-2 cursor-pointer"
+              <div
+                className="flex cursor-pointer items-center gap-4 border-2 p-5"
                 style={{
-                  borderColor: '#015023',
-                  borderRadius: '12px',
-                  opacity: 0.7
+                  borderColor: "#015023",
+                  borderRadius: "12px",
+                  opacity: 0.7,
                 }}
               >
                 <input
-                  type="checkbox"
                   id="is_active"
                   name="is_active"
+                  type="checkbox"
                   checked={formData.is_active}
                   onChange={handleChange}
-                  className="w-6 h-6 cursor-pointer accent-[#015023]"
-                  style={{
-                    borderRadius: '6px'
-                  }}
                   disabled={isLoading}
+                  className="h-6 w-6 cursor-pointer accent-[#015023]"
                 />
                 <div className="flex-1">
-                  <FieldLabel htmlFor="is_active" className="cursor-pointer mb-1">
+                  <FieldLabel htmlFor="is_active" className="mb-1 cursor-pointer">
                     Status Aktif
                   </FieldLabel>
                   <FieldDescription className="mt-0">
-                    Centang jika akun manager ini aktif dan dapat login
+                    Nonaktifkan jika akun manager tidak boleh login.
                   </FieldDescription>
                 </div>
-                {formData.is_active && (
-                  <div 
-                    className="px-3 py-1 rounded text-xs font-semibold"
-                    style={{
-                      backgroundColor: '#16874B',
-                      color: '#FFFFFF',
-                      borderRadius: '12px'
-                    }}
-                  >
-                    Active
-                  </div>
-                )}
               </div>
             </Field>
 
-            {/* Action Buttons */}
+            {errors.form && <ErrorMessageBox message={errors.form} />}
+
+            {success && (
+              <SuccessMessageBoxWithButton
+                message={`${success} Akan kembali ke daftar akun dalam ${countdown} detik.`}
+                action={handleFinish}
+                btntext={countdown > 0 ? `Lihat Data (${countdown})` : "Lihat Data"}
+              />
+            )}
+
             <div className="pt-8">
-              <div 
-                className="w-full h-px mb-8"
-                style={{ 
-                  background: 'linear-gradient(to right, transparent, #015023, transparent)',
-                  opacity: 0.3
+              <div
+                className="mb-8 h-px w-full"
+                style={{
+                  background:
+                    "linear-gradient(to right, transparent, #015023, transparent)",
+                  opacity: 0.3,
                 }}
               />
-              
-              <div className="flex flex-col sm:flex-row gap-4">
+
+              <div className="flex flex-col gap-4 sm:flex-row">
                 <Button
                   type="submit"
                   variant="default"
                   disabled={isLoading}
-                  className="flex-1 sm:flex-none sm:min-w-[200px]"
+                  className="flex-1 sm:min-w-[200px]"
                 >
                   {isLoading ? (
-                    <>
-                      <span className="animate-spin mr-2">⏳</span>
-                      Menyimpan...
-                    </>
+                    <>Menyimpan...</>
                   ) : (
                     <>
-                      <Save className="w-5 h-5 mr-2" />
-                      Update Data
+                      <Save className="mr-2 h-5 w-5" />
+                      Simpan Perubahan
                     </>
                   )}
                 </Button>
-                
+
                 <Button
                   type="button"
                   variant="warning"
-                  onClick={handleCancel}
                   disabled={isLoading}
-                  className="flex-1 sm:flex-none sm:min-w-[200px]"
+                  onClick={() => setShowCancelDialog(true)}
+                  className="flex-1 sm:min-w-[200px]"
                 >
-                  <X className="w-5 h-5 mr-2" />
+                  <X className="mr-2 h-5 w-5" />
                   Batal
                 </Button>
               </div>
@@ -505,56 +488,66 @@ function EditManagerForm() {
           </form>
         </div>
 
-        {/* Info Box */}
-        <div 
-          className="mt-8 p-6 border-2 shadow-md"
+        <div
+          className="mt-8 border-2 p-6 shadow-md"
           style={{
-            borderColor: '#DABC4E',
-            borderRadius: '12px',
-            background: 'linear-gradient(135deg, #FFFEF7 0%, #FFF9E6 100%)'
+            borderColor: "#DABC4E",
+            borderRadius: "12px",
+            background: "linear-gradient(135deg, #FFFEF7 0%, #FFF9E6 100%)",
           }}
         >
           <div className="flex items-start gap-4">
-            <div 
-              className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+            <div
+              className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full"
               style={{
-                backgroundColor: '#DABC4E',
-                color: '#015023'
+                backgroundColor: "#DABC4E",
+                color: "#015023",
               }}
             >
-              <Info className="w-5 h-5" />
+              <Info className="h-5 w-5" />
             </div>
             <div>
-              <h3 
-                className="font-bold text-lg mb-2"
-                style={{ 
-                  fontFamily: 'Urbanist, sans-serif',
-                  color: '#015023'
+              <h3
+                className="mb-2 text-lg font-bold"
+                style={{
+                  fontFamily: "Urbanist, sans-serif",
+                  color: "#015023",
                 }}
               >
                 Catatan Penting
               </h3>
-              <p 
+              <p
                 className="text-sm leading-relaxed"
-                style={{ 
-                  fontFamily: 'Urbanist, sans-serif',
-                  color: '#015023'
+                style={{
+                  fontFamily: "Urbanist, sans-serif",
+                  color: "#015023",
                 }}
               >
-                Pastikan semua perubahan data sudah benar sebelum menyimpan. 
-                Kosongkan field password jika tidak ingin mengubah password yang sudah ada.
+                Halaman ini sekarang membaca data manager dari backend deployed.
+                Jika penyimpanan gagal, kemungkinan endpoint update manager belum
+                tersedia di deployment backend saat ini.
               </p>
             </div>
           </div>
         </div>
       </div>
+
+      <AlertConfirmationRedDialog
+        open={showCancelDialog}
+        onOpenChange={setShowCancelDialog}
+        title="Konfirmasi Pembatalan"
+        description="Apakah Anda yakin ingin membatalkan? Perubahan yang belum disimpan akan hilang."
+        onConfirm={handleFinish}
+        confirmText="Ya, Batalkan"
+        cancelText="Lanjutkan Edit"
+      />
     </div>
   );
 }
 
 export default function Page() {
   return (
-    <Suspense fallback={<LoadingEffect message="Memuat data akun..." />}>
+    <Suspense fallback={<LoadingEffect message="Memuat data manager..." />}>
       <EditManagerForm />
     </Suspense>
   );

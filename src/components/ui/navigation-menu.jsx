@@ -19,6 +19,7 @@ import { AlertConfirmationRedDialog } from '@/components/ui/alert-dialog'
 import ChatModal from '@/components/ui/chatmodal'
 import NavbarNotification from '@/components/ui/navbar-notification'
 import PersuratanDropdown from '@/features/persuratan/components/PersuratanDropdown'
+import BimbinganDropdown from '@/features/bimbingan-ta/components/BimbinganDropdown'
 import { useAuth } from '@/lib/auth-context'
 import { logout } from '@/lib/sessionApi'
 
@@ -44,7 +45,11 @@ const NavbarBrand = forwardRef(({ className, isScrolled, ...props }, ref) => (
   </Link>
 ))
 
-const NavbarMenu = forwardRef(({ className, isMobileMenuOpen, setIsMobileMenuOpen, ...props }, ref) => (
+const NavbarMenu = forwardRef(({ className, isMobileMenuOpen, setIsMobileMenuOpen, ...props }, ref) => {
+  const { user } = useAuth();
+  const userRole = user?.roles;
+
+  return (
   <>
     {/* Desktop Menu */}
     <div
@@ -56,6 +61,7 @@ const NavbarMenu = forwardRef(({ className, isMobileMenuOpen, setIsMobileMenuOpe
       <NavbarMenuItem href="/kehadiran">Kehadiran</NavbarMenuItem>
       <NavbarMenuItem href="/hasil-studi">Hasil Studi</NavbarMenuItem>
       <PersuratanDropdown />
+      <BimbinganDropdown role={userRole} />
     </div>
 
     {/* Mobile Menu Overlay */}
@@ -117,10 +123,65 @@ const NavbarMenu = forwardRef(({ className, isMobileMenuOpen, setIsMobileMenuOpe
         >
           Status Persuratan
         </MobileNavMenuItem>
+
+        {/* Bimbingan section */}
+        <div className="mt-2 pt-2 border-t border-gray-200">
+          <span className="px-4 py-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">Bimbingan</span>
+        </div>
+        {userRole === 'dosen' ? (
+          <>
+            <MobileNavMenuItem
+              href="/dosen/bimbingan/kelola-judul"
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              Kelola Judul TA
+            </MobileNavMenuItem>
+            <MobileNavMenuItem
+              href="/dosen/bimbingan/validasi"
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              Validasi Pengajuan TA
+            </MobileNavMenuItem>
+            <MobileNavMenuItem
+              href="/dosen/bimbingan/monitoring"
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              Monitoring
+            </MobileNavMenuItem>
+          </>
+        ) : (
+          <>
+            <MobileNavMenuItem
+              href="/bimbingan/pengajuan"
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              Status Pengajuan TA
+            </MobileNavMenuItem>
+            <MobileNavMenuItem
+              href="/bimbingan/pengajuan/buat"
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              Pengajuan TA
+            </MobileNavMenuItem>
+            <MobileNavMenuItem
+              href="/bimbingan/galeri-judul"
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              Galeri Judul TA
+            </MobileNavMenuItem>
+            <MobileNavMenuItem
+              href="/bimbingan/monitoring"
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              Monitoring
+            </MobileNavMenuItem>
+          </>
+        )}
       </div>
     </div>
   </>
-))
+  );
+})
 
 const MobileNavMenuItem = forwardRef(({ className, href, children, onClick, ...props }, ref) => {
   const pathname = usePathname();

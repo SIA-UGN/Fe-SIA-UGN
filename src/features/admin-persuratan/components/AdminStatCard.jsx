@@ -30,37 +30,37 @@ export default function AdminStatCard({ stats = {}, isLoading = false }) {
             </div>
 
             {/* ── Center: 3 status counts (absolutely centered) ── */}
-            <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-8 z-10">
+            <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-4 md:gap-8 z-10 max-[980px]:relative max-[980px]:left-auto max-[980px]:translate-x-0 max-[980px]:mt-4 max-[980px]:w-full max-[980px]:justify-between">
                 {/* Diproses */}
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 md:gap-2 max-[980px]:flex-1 max-[980px]:justify-center">
                     <Clock size={16} className="text-white/60" />
                     <div className="flex flex-col items-center">
-                        <span className="text-2xl font-bold" style={{ color: '#E5C158' }}>
+                        <span className="text-xl md:text-2xl font-bold" style={{ color: '#E5C158' }}>
                             {isLoading ? '...' : diproses}
                         </span>
-                        <span className="text-white/60 text-[11px] font-medium">Diproses</span>
+                        <span className="text-white/60 text-[10px] md:text-[11px] font-medium">Diproses</span>
                     </div>
                 </div>
 
                 {/* Selesai */}
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 md:gap-2 max-[980px]:flex-1 max-[980px]:justify-center">
                     <CheckCircle2 size={16} className="text-white/60" />
                     <div className="flex flex-col items-center">
-                        <span className="text-2xl font-bold text-emerald-400">
+                        <span className="text-xl md:text-2xl font-bold text-emerald-400">
                             {isLoading ? '...' : selesai}
                         </span>
-                        <span className="text-white/60 text-[11px] font-medium">Selesai</span>
+                        <span className="text-white/60 text-[10px] md:text-[11px] font-medium">Selesai</span>
                     </div>
                 </div>
 
                 {/* Ditolak */}
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 md:gap-2 max-[980px]:flex-1 max-[980px]:justify-center">
                     <XCircle size={16} className="text-white/60" />
                     <div className="flex flex-col items-center">
-                        <span className="text-2xl font-bold text-red-400">
+                        <span className="text-xl md:text-2xl font-bold text-red-400">
                             {isLoading ? '...' : ditolak}
                         </span>
-                        <span className="text-white/60 text-[11px] font-medium">Ditolak</span>
+                        <span className="text-white/60 text-[10px] md:text-[11px] font-medium">Ditolak</span>
                     </div>
                 </div>
             </div>
