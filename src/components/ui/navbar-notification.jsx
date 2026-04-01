@@ -18,8 +18,9 @@ import { useChatContext } from '@/lib/chat-context';
 import { getEcho } from '@/lib/echo';
 import { getNotifications, markAsRead } from '@/lib/notificationApi';
 import { getConversationDetail } from '@/lib/chatApi';
+import { getThesisNotificationTarget } from '@/features/bimbingan-ta/utils';
 
-const NavbarNotification = forwardRef(({ className, isChatOpen, chatUser, setChatUser, setIsChatOpen }, ref) => {
+const NavbarNotification = forwardRef(({ className, isChatOpen, setChatUser, setIsChatOpen }, ref) => {
   const router = useRouter();
   
   const { activeChatConversation } = useChatContext();
@@ -86,7 +87,8 @@ const NavbarNotification = forwardRef(({ className, isChatOpen, chatUser, setCha
           message: notif.message,
           date: notif.sent_at,
           isRead: notif.is_read,
-          metadata: notif.metadata
+          metadata: notif.metadata,
+          id_thesis_lecturer: notif.id_thesis_lecturer ?? notif.metadata?.id_thesis_lecturer ?? null
         }));
         setNotifications(transformed);
 
@@ -174,7 +176,12 @@ const NavbarNotification = forwardRef(({ className, isChatOpen, chatUser, setCha
                 message: event.notification?.message || event.message,
                 date: event.notification?.sentAt || new Date().toISOString(),
                 isRead: event.notification?.isRead || false,
-                metadata: notifMetadata
+                metadata: notifMetadata,
+                id_thesis_lecturer:
+                  event.notification?.id_thesis_lecturer ||
+                  event.id_thesis_lecturer ||
+                  notifMetadata?.id_thesis_lecturer ||
+                  null
             };
 
             setNotifications(prev => {
@@ -301,6 +308,10 @@ const NavbarNotification = forwardRef(({ className, isChatOpen, chatUser, setCha
         ) : (
           notifications.map((notification, index) => (
             <Fragment key={notification.id}>
+              {(() => {
+                const thesisTarget = getThesisNotificationTarget(notification);
+
+                return (
               <DropdownMenuItem
                 className="flex-col items-start p-3 cursor-pointer"
                 onClick={async () => {
@@ -328,6 +339,8 @@ const NavbarNotification = forwardRef(({ className, isChatOpen, chatUser, setCha
                     } catch (err) {
                       console.error('Error fetching conversation:', err);
                     }
+                  } else if (thesisTarget) {
+                    router.push(thesisTarget.href);
                   } else {
                     router.push(`/notif?highlight=${notification.id}`);
                   }
@@ -339,11 +352,16 @@ const NavbarNotification = forwardRef(({ className, isChatOpen, chatUser, setCha
                       <div
                         className="px-2 py-0.5 rounded text-xs font-semibold shrink-0"
                         style={{
-                          backgroundColor: notification.type === 'chat' ? '#DABC4E' : '#015023',
+                          backgroundColor:
+                            notification.type === 'chat'
+                              ? '#DABC4E'
+                              : thesisTarget
+                                ? '#16874B'
+                                : '#015023',
                           color: 'white'
                         }}
                       >
-                        {notification.type === 'chat' ? 'Chat' : 'Info'}
+                        {notification.type === 'chat' ? 'Chat' : thesisTarget ? 'TA' : 'Info'}
                       </div>
                       <p className="font-semibold text-sm line-clamp-1" style={{ color: 'brand-green', fontFamily: 'Urbanist, sans-serif' }}>
                         {notification.title}
@@ -361,6 +379,8 @@ const NavbarNotification = forwardRef(({ className, isChatOpen, chatUser, setCha
                   </p>
                 </div>
               </DropdownMenuItem>
+                );
+              })()}
               {index < notifications.length - 1 && <DropdownMenuSeparator />}
             </Fragment>
           ))

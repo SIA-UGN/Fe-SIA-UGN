@@ -32,11 +32,11 @@ const buttonVariants = cva(
 )
 
 function Button({
-  className,
+  className = "",
   variant = "default",
-  size,
+  size = "default",
   asChild = false,
-  style,
+  style = {},
   ...props
 }) {
   const Comp = asChild ? Slot : "button"
@@ -76,29 +76,29 @@ function Button({
 }
 
 // Convenience components for easier usage
-const PrimaryButton = React.forwardRef((props, ref) => (
-  <Button ref={ref} variant="primary" {...props} />
-))
+function PrimaryButton(props) {
+  return <Button variant="primary" {...props} />
+}
 
-const SecondaryButton = React.forwardRef((props, ref) => (
-  <Button ref={ref} variant="secondary" {...props} />
-))
+function SecondaryButton(props) {
+  return <Button variant="secondary" {...props} />
+}
 
-const WarningButton = React.forwardRef((props, ref) => (
-  <Button ref={ref} variant="warning" {...props} />
-))
+function WarningButton(props) {
+  return <Button variant="warning" {...props} />
+}
 
-const SuccessButton = React.forwardRef((props, ref) => (
-  <Button ref={ref} variant="success" {...props} />
-))
+function SuccessButton(props) {
+  return <Button variant="success" {...props} />
+}
 
-const OutlineButton = React.forwardRef((props, ref) => (
-  <Button ref={ref} variant="outline" {...props} />
-))
+function OutlineButton(props) {
+  return <Button variant="outline" {...props} />
+}
 
-const GhostButton = React.forwardRef((props, ref) => (
-  <Button ref={ref} variant="ghost" {...props} />
-))
+function GhostButton(props) {
+  return <Button variant="ghost" {...props} />
+}
 
 PrimaryButton.displayName = "PrimaryButton"
 SecondaryButton.displayName = "SecondaryButton"

@@ -127,7 +127,6 @@ export default function AdminDetailSuratPage({
     return (
         <div className="min-h-screen flex flex-col">
             {/* Admin Navbar */}
-            {/* @ts-expect-error — AdminNavbar is a JS component; TS cannot infer props */}
             <AdminNavbar title="Detail Persuratan" />
 
             {/* Main Content */}

@@ -1,8 +1,4 @@
-import axiosInstance from '@/lib/axios';
-
-/* ------------------------------------------------------------------ */
-/*  Types                                                              */
-/* ------------------------------------------------------------------ */
+import { studentThesisApi } from '@/features/bimbingan-ta/api/student';
 
 export type TAStatus = 'diproses' | 'ditolak' | 'approved';
 
@@ -14,9 +10,9 @@ export interface Dosen {
 
 export interface PengajuanTA {
   id: number;
-  tanggal: string;          // ISO date string
+  tanggal: string;
   judul: string;
-  dosen: string;             // Dosen name (display)
+  dosen: string;
   id_dosen?: number;
   status: TAStatus;
   ringkasan?: string;
@@ -30,96 +26,74 @@ export interface CreateTAPayload {
   file?: File | null;
 }
 
-/* ------------------------------------------------------------------ */
-/*  Service (placeholder — swap with real endpoints later)             */
-/* ------------------------------------------------------------------ */
+function mapRequestStatus(status?: string): TAStatus {
+  if (status === 'accepted') return 'approved';
+  if (status === 'rejected') return 'ditolak';
+  return 'diproses';
+}
 
 export const taService = {
-  /**
-   * Fetch all TA submissions for the current student.
-   */
-  getAll: async (): Promise<PengajuanTA[]> => {
-    // TODO: replace with real endpoint
-    // const { data } = await axiosInstance.get<{ data: PengajuanTA[] }>('/ta/pengajuan');
-    // return data.data;
+  async getAll(): Promise<PengajuanTA[]> {
+    const [thesis, requests] = await Promise.all([
+      studentThesisApi.getCurrentThesis(),
+      studentThesisApi.getRequests(),
+    ]);
 
-    // ── Mock data ──────────────────────────────────────────────
-    return new Promise((resolve) =>
-      setTimeout(
-        () =>
-          resolve([
-            {
-              id: 1,
-              tanggal: '2025-06-10',
-              judul: 'Pengembangan Sistem Informasi Akademik Berbasis Web',
-              dosen: 'Dr. Ahmad Fauzi, M.Kom.',
-              status: 'approved',
-            },
-            {
-              id: 2,
-              tanggal: '2025-05-22',
-              judul: 'Analisis Sentimen Media Sosial Menggunakan NLP',
-              dosen: 'Prof. Siti Nurhaliza, Ph.D.',
-              status: 'diproses',
-            },
-            {
-              id: 3,
-              tanggal: '2025-04-15',
-              judul: 'Implementasi Machine Learning untuk Prediksi Cuaca',
-              dosen: 'Dr. Budi Santoso, M.T.',
-              status: 'ditolak',
-            },
-            {
-              id: 4,
-              tanggal: '2025-03-08',
-              judul: 'Rancang Bangun Aplikasi E-Commerce dengan Microservices',
-              dosen: 'Dr. Ahmad Fauzi, M.Kom.',
-              status: 'diproses',
-            },
-          ]),
-        800,
-      ),
-    );
+    if (!thesis) {
+      return [];
+    }
+
+    if (requests.length === 0) {
+      return [
+        {
+          id: thesis.id_student_thesis,
+          tanggal: thesis.created_at || new Date().toISOString(),
+          judul: thesis.title_ind,
+          dosen: thesis.supervisors?.[0]?.lecturer?.name || '-',
+          id_dosen: thesis.supervisors?.[0]?.id_lecturer,
+          status: thesis.status === 'finished' ? 'approved' : 'diproses',
+          ringkasan: thesis.description || '',
+          attachment_url: thesis.attachment_proposal || undefined,
+        },
+      ];
+    }
+
+    return requests.map((request) => ({
+      id: request.id_thesis_lecturer,
+      tanggal: request.created_at || thesis.created_at || new Date().toISOString(),
+      judul: request.student_thesis?.title_ind || thesis.title_ind,
+      dosen: request.lecturer?.name || `Dosen #${request.id_lecturer}`,
+      id_dosen: request.id_lecturer,
+      status: mapRequestStatus(request.status),
+      ringkasan: request.student_thesis?.description || thesis.description || '',
+      attachment_url:
+        request.student_thesis?.attachment_proposal || thesis.attachment_proposal || undefined,
+    }));
   },
 
-  /**
-   * Create a new TA pengajuan (multipart for file upload).
-   */
-  create: async (payload: CreateTAPayload) => {
-    // TODO: replace with real endpoint
-    // const formData = new FormData();
-    // formData.append('judul', payload.judul);
-    // formData.append('ringkasan', payload.ringkasan);
-    // formData.append('id_dosen', String(payload.id_dosen));
-    // if (payload.file) formData.append('file', payload.file);
-    // return axiosInstance.post('/ta/pengajuan', formData, {
-    //   headers: { 'Content-Type': 'multipart/form-data' },
-    // });
+  async create(payload: CreateTAPayload) {
+    const thesis = await studentThesisApi.createThesis({
+      title_ind: payload.judul,
+      title_eng: payload.judul,
+      topic: payload.judul,
+      description: payload.ringkasan,
+      attachment_proposal: payload.file || null,
+    });
 
-    return new Promise<{ success: boolean }>((resolve) =>
-      setTimeout(() => resolve({ success: true }), 1000),
-    );
+    await studentThesisApi.requestLecturer(thesis.id_student_thesis, {
+      id_lecturer: payload.id_dosen,
+    });
+
+    return { success: true };
   },
 
-  /**
-   * Fetch list of available dosen pembimbing.
-   */
-  getDosenList: async (): Promise<Dosen[]> => {
-    // TODO: replace with real endpoint
-    // const { data } = await axiosInstance.get<{ data: Dosen[] }>('/ta/dosen');
-    // return data.data;
-
-    return new Promise((resolve) =>
-      setTimeout(
-        () =>
-          resolve([
-            { id: 1, name: 'Dr. Ahmad Fauzi, M.Kom.', nip: '198501012010011001' },
-            { id: 2, name: 'Prof. Siti Nurhaliza, Ph.D.', nip: '197803152005012001' },
-            { id: 3, name: 'Dr. Budi Santoso, M.T.', nip: '198207202008011002' },
-            { id: 4, name: 'Dr. Rina Wulandari, M.Cs.', nip: '199001102015012001' },
-          ]),
-        500,
-      ),
-    );
+  async getDosenList(): Promise<Dosen[]> {
+    const lecturers = await studentThesisApi.getLecturers();
+    return lecturers.map((lecturer) => ({
+      id: lecturer.id_user_si,
+      name: lecturer.name,
+      nip: lecturer.staff_profile?.employee_id_number || lecturer.username || '-',
+    }));
   },
 };
+

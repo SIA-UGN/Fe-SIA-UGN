@@ -30,11 +30,11 @@ function ErrorMessageBox({
 }
 function ErrorMessageBoxWithButton({
     message,
-    action,
-    btntext,
-    back,
-    actionback,
-    btntextback,
+    action = () => {},
+    btntext = 'Coba Lagi',
+    back = false,
+    actionback = () => {},
+    btntextback = 'Kembali',
 }) {
     return (
         <div 
@@ -65,7 +65,7 @@ function ErrorMessageBoxWithButton({
                     onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#4B5563'}
                     onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#6B7280'}
                 >
-                    {btntextback ? btntextback : 'Kembali'}
+                    {btntextback}
                 </button>
                 )}
                 <button
@@ -79,7 +79,7 @@ function ErrorMessageBoxWithButton({
                     onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#B91C1C'}
                     onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#DC2626'}
                 >
-                    {btntext ? btntext : 'Coba Lagi'}
+                    {btntext}
                 </button>
             </div>
         </div>
@@ -113,8 +113,8 @@ function SuccessMessageBox({
 }
 function SuccessMessageBoxWithButton({
     message,
-    action,
-    btntext,
+    action = () => {},
+    btntext = 'Lanjutkan',
 }) {
     return (
         <div 
@@ -145,7 +145,7 @@ function SuccessMessageBoxWithButton({
                     onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#047857'}
                     onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#059669'}
                 >
-                    {btntext ? btntext : 'Lanjutkan'}
+                    {btntext}
                 </button>
             </div>
         </div>

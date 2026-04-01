@@ -9,7 +9,7 @@ import Footer from '@/components/ui/footer'
 import { useDashboardStats } from '@/features/admin-dashboard/hooks/useDashboardStats'
 import Cookies from 'js-cookie'
 import { ErrorMessageBoxWithButton } from '@/components/ui/message-box'
-import { Megaphone, Mail } from 'lucide-react'
+import { GraduationCap, Megaphone, Mail } from 'lucide-react'
 
 // Icons - using icons from /public/icon folder
 const PlusIcon = () => (
@@ -136,6 +136,9 @@ export default function AdminDashboard() {
       case 'manage-persuratan':
         router.push('/adminpage/persuratan');
         break;
+      case 'manage-thesis':
+        router.push('/admin/bimbingan');
+        break;
       default:
         console.log('Unknown action type');
     }
@@ -205,6 +208,13 @@ export default function AdminDashboard() {
       description: 'Kelola surat masuk dan keluar universitas',
       icon: <Mail className="w-8 h-8" />,
       action: () => handleCardClick('manage-persuratan')
+    },
+    {
+      id: 'manage-thesis',
+      title: 'Manajemen Bimbingan TA',
+      description: 'Pantau pengajuan, pembimbing, topik, dan konsultasi tugas akhir',
+      icon: <GraduationCap className="w-8 h-8" />,
+      action: () => handleCardClick('manage-thesis')
     },
   ];
 
