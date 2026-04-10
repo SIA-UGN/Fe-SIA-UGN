@@ -156,13 +156,13 @@ function AlertDialogCancel({
 }
 
 function AlertConfirmationDialog({
-  open,
-  onOpenChange,
-  title,
-  description,
-  confirmText,
-  cancelText,
-  onConfirm,
+  open = false,
+  onOpenChange = (_open) => {},
+  title = "Konfirmasikan",
+  description = "Apakah Anda yakin ingin melanjutkan?",
+  confirmText = "Lanjutkan",
+  cancelText = "Batal",
+  onConfirm = () => {},
 }) {
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -188,13 +188,13 @@ function AlertConfirmationDialog({
   );
 }
 function AlertConfirmationRedDialog({
-  open,
-  onOpenChange,
-  title,
-  description,
-  confirmText,
-  cancelText,
-  onConfirm,
+  open = false,
+  onOpenChange = (_open) => {},
+  title = "Konfirmasikan",
+  description = "Apakah Anda yakin ingin melanjutkan?",
+  confirmText = "Lanjutkan",
+  cancelText = "Batal",
+  onConfirm = () => {},
 }) {
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -220,15 +220,15 @@ function AlertConfirmationRedDialog({
   );
 }
 function AlertConfirmationDialogTwoOption({
-  open,
-  onOpenChange,
-  title,
-  description,
-  confirmText,
-  closeText,
-  cancelText,
-  onConfirm,
-  onCancel,
+  open = false,
+  onOpenChange = (_open) => {},
+  title = "Konfirmasikan",
+  description = "Apakah Anda yakin ingin melanjutkan?",
+  confirmText = "Lanjutkan",
+  closeText = "Batal",
+  cancelText = "Lanjutkan",
+  onConfirm = () => {},
+  onCancel = () => {},
 }) {
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -258,11 +258,11 @@ function AlertConfirmationDialogTwoOption({
 }
 
 function AlertErrorDialog({
-  open,
-  onOpenChange,
-  title,
-  description,
-  closeText,
+  open = false,
+  onOpenChange = (_open) => {},
+  title = "Error",
+  description = "Terjadi kesalahan. Silakan coba lagi.",
+  closeText = "Tutup",
 }) {
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -284,11 +284,11 @@ function AlertErrorDialog({
 }
 
 function AlertSuccessDialog({
-  open,
-  onOpenChange,
-  title,
-  description,
-  closeText,
+  open = false,
+  onOpenChange = (_open) => {},
+  title = "Success",
+  description = "Operasi berhasil diselesaikan.",
+  closeText = "Tutup",
 }) {
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -310,11 +310,11 @@ function AlertSuccessDialog({
 }
 
 function AlertInfoDialog({
-  open,
-  onOpenChange,
-  title,
-  description,
-  closeText,
+  open = false,
+  onOpenChange = (_open) => {},
+  title = "Info",
+  description = "Informasi penting untuk diketahui.",
+  closeText = "Tutup",
 }) {
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -335,11 +335,11 @@ function AlertInfoDialog({
   );
 }
 function AlertWarningDialog({
-  open,
-  onOpenChange,
-  title,
-  description,
-  closeText,
+  open = false,
+  onOpenChange = (_open) => {},
+  title = "Info",
+  description = "Informasi penting untuk diketahui.",
+  closeText = "Tutup",
 }) {
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>

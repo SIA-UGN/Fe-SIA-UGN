@@ -8,7 +8,7 @@ import {
 import { cn } from "@/lib/utils"
 
 function Pagination({
-  className,
+  className = "",
   ...props
 }) {
   return (
@@ -23,7 +23,7 @@ function Pagination({
 }
 
 function PaginationContent({
-  className,
+  className = "",
   ...props
 }) {
   return (
@@ -41,7 +41,7 @@ function PaginationItem({
 }
 
 function PaginationLink({
-  className,
+  className = "",
   isActive,
   size = "icon",
   ...props
@@ -71,7 +71,7 @@ function PaginationLink({
 }
 
 function PaginationPrevious({
-  className,
+  className = "",
   ...props
 }) {
   return (
@@ -87,7 +87,7 @@ function PaginationPrevious({
 }
 
 function PaginationNext({
-  className,
+  className = "",
   ...props
 }) {
   return (
@@ -103,7 +103,7 @@ function PaginationNext({
 }
 
 function PaginationEllipsis({
-  className,
+  className = "",
   ...props
 }) {
   return (

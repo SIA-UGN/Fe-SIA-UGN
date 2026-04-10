@@ -6,13 +6,33 @@ import Navbar from '@/components/ui/navigation-menu'
 import Footer from '@/components/ui/footer'
 import LoadingEffect from '@/components/ui/loading-effect'
 import { ErrorMessageBoxWithButton, SuccessMessageBox } from '@/components/ui/message-box' 
-import { ArrowLeft, Bell, MessageCircle, Check, X } from 'lucide-react'
-import { getNotifications, markAsRead, markAllAsRead, deleteNotification } from '@/lib/notificationApi'
+import { ArrowLeft, Bell, Check, GraduationCap, MessageCircle, X } from 'lucide-react'
+import { getNotifications, markAsRead, deleteNotification } from '@/lib/notificationApi'
 import { getConversationDetail } from '@/lib/chatApi'
 import { AlertConfirmationRedDialog } from '@/components/ui/alert-dialog'
 import ChatModal from '@/components/ui/chatmodal'
 import { getEcho } from '@/lib/echo'
 import Cookies from 'js-cookie'
+import { getThesisNotificationTarget } from '@/features/bimbingan-ta/utils'
+
+const getNotificationKind = (notification) => {
+  if (notification.type === 'chat') {
+    return 'chat'
+  }
+
+  if (getThesisNotificationTarget(notification)) {
+    return 'thesis'
+  }
+
+  return 'announcement'
+}
+
+const getFilterLabel = (filter) => {
+  if (filter === 'announcement') return 'pengumuman'
+  if (filter === 'thesis') return 'notifikasi bimbingan'
+  if (filter === 'chat') return 'chat'
+  return 'notifikasi'
+}
 
 function NotifikasiPage() {
   const router = useRouter()
@@ -60,7 +80,8 @@ function NotifikasiPage() {
           kelas: notif.metadata?.class_code || null,
           pengumum: notif.sender || 'System',
           isRead: notif.is_read,
-          metadata: notif.metadata
+          metadata: notif.metadata,
+          id_thesis_lecturer: notif.id_thesis_lecturer ?? notif.metadata?.id_thesis_lecturer ?? null
         }))
 
         setAllNotifications(transformedNotifications)
@@ -135,7 +156,11 @@ function NotifikasiPage() {
             kelas: event.notification.metadata?.class_code || null,
             pengumum: event.notification.sender || 'System',
             isRead: event.notification.is_read || false,
-            metadata: event.notification.metadata || {}
+            metadata: event.notification.metadata || {},
+            id_thesis_lecturer:
+              event.notification.id_thesis_lecturer ||
+              event.notification.metadata?.id_thesis_lecturer ||
+              null
           }
           
           console.log('[NotifPage] ✅ Adding new notification to list:', newNotif)
@@ -241,7 +266,7 @@ function NotifikasiPage() {
       // Filter notifikasi berdasarkan tab yang aktif
       const notificationsToMark = filter === 'all' 
         ? allNotifications 
-        : allNotifications.filter(notif => notif.type === filter)
+        : allNotifications.filter(notif => getNotificationKind(notif) === filter)
       
       // Get IDs yang perlu di-mark (skip temp IDs)
       const idsToMark = notificationsToMark
@@ -261,7 +286,7 @@ function NotifikasiPage() {
       // Update UI: mark yang sesuai filter sebagai read
       setAllNotifications(prev =>
         prev.map(notif => {
-          if (filter === 'all' || notif.type === filter) {
+          if (filter === 'all' || getNotificationKind(notif) === filter) {
             return { ...notif, isRead: true }
           }
           return notif
@@ -269,9 +294,7 @@ function NotifikasiPage() {
       )
       
       // Success message berdasarkan filter
-      const filterLabel = filter === 'all' ? 'Semua notifikasi' : 
-                          filter === 'announcement' ? 'Semua pengumuman' : 
-                          'Semua chat'
+      const filterLabel = filter === 'all' ? 'Semua notifikasi' : `Semua ${getFilterLabel(filter)}`
       setSuccessMessage(`${filterLabel} telah ditandai sebagai dibaca`)
       
     } catch (err) {
@@ -317,6 +340,8 @@ function NotifikasiPage() {
       await handleMarkAsRead(notif.id)
     }
 
+    const thesisTarget = getThesisNotificationTarget(notif)
+
     if (notif.type === 'chat' && notif.metadata?.id_conversation) {
       try {
         const response = await getConversationDetail(notif.metadata.id_conversation)
@@ -332,6 +357,11 @@ function NotifikasiPage() {
       } catch (err) {
         console.error('Error fetching conversation:', err)
       }
+      return
+    }
+
+    if (thesisTarget) {
+      router.push(thesisTarget.href)
     }
   }
 
@@ -346,7 +376,7 @@ function NotifikasiPage() {
       // Filter notifikasi berdasarkan tab yang aktif
       const notificationsToDelete = filter === 'all' 
         ? allNotifications 
-        : allNotifications.filter(notif => notif.type === filter)
+        : allNotifications.filter(notif => getNotificationKind(notif) === filter)
       
       // Get real IDs (skip temp IDs)
       const realIds = notificationsToDelete
@@ -375,14 +405,12 @@ function NotifikasiPage() {
         setAllNotifications([])
       } else {
         setAllNotifications(prev => 
-          prev.filter(notif => notif.type !== filter)
+          prev.filter(notif => getNotificationKind(notif) !== filter)
         )
       }
       
       // Success message berdasarkan filter
-      const filterLabel = filter === 'all' ? 'Semua notifikasi' : 
-                          filter === 'announcement' ? 'Semua pengumuman' : 
-                          'Semua chat'
+      const filterLabel = filter === 'all' ? 'Semua notifikasi' : `Semua ${getFilterLabel(filter)}`
       setSuccessMessage(`${filterLabel} berhasil dihapus`)
     } catch (err) {
       console.error('Error deleting all notifications:', err)
@@ -395,7 +423,7 @@ function NotifikasiPage() {
 
   const filteredNotifications = filter === 'all'
     ? allNotifications
-    : allNotifications.filter(notif => notif.type === filter)
+    : allNotifications.filter(notif => getNotificationKind(notif) === filter)
 
   const formatDate = (dateString) => {
     // Handle tanggal tidak valid
@@ -420,7 +448,7 @@ function NotifikasiPage() {
           <div style={{ maxWidth: '600px', width: '100%', padding: '0 24px' }}>
             <ErrorMessageBoxWithButton 
               message={error}
-              onRetry={fetchNotifications}
+              action={fetchNotifications}
             />
           </div>
         </main>
@@ -443,7 +471,7 @@ function NotifikasiPage() {
             {error && allNotifications.length > 0 && (
               <ErrorMessageBoxWithButton 
                 message={error}
-                onRetry={fetchNotifications}
+                action={fetchNotifications}
               />
             )}
           </div>
@@ -477,8 +505,8 @@ function NotifikasiPage() {
                 </h1>
                 <p style={{ fontSize: '16px', color: '#015023', opacity: 0.7, marginTop: '8px' }}>
                   {unreadCount > 0 
-                    ? `${unreadCount} ${filter === 'all' ? 'notifikasi' : filter === 'announcement' ? 'pengumuman' : 'chat'} belum dibaca` 
-                    : `Semua ${filter === 'all' ? 'notifikasi' : filter === 'announcement' ? 'pengumuman' : 'chat'} sudah dibaca`}
+                    ? `${unreadCount} ${getFilterLabel(filter)} belum dibaca` 
+                    : `Semua ${getFilterLabel(filter)} sudah dibaca`}
                 </p>
               </div>
 
@@ -550,6 +578,7 @@ function NotifikasiPage() {
             {[
               { value: 'all', label: 'Semua', icon: Bell },
               { value: 'announcement', label: 'Pengumuman', icon: Bell },
+              { value: 'thesis', label: 'Bimbingan TA', icon: GraduationCap },
               { value: 'chat', label: 'Chat', icon: MessageCircle }
             ].map((tab) => {
               const Icon = tab.icon
@@ -608,14 +637,21 @@ function NotifikasiPage() {
               </div>
             ) : (
               filteredNotifications.map((notif) => {
-                const Icon = notif.type === 'chat' ? MessageCircle : Bell;
+                const notificationKind = getNotificationKind(notif)
+                const thesisTarget = getThesisNotificationTarget(notif)
+                const Icon =
+                  notificationKind === 'chat'
+                    ? MessageCircle
+                    : notificationKind === 'thesis'
+                      ? GraduationCap
+                      : Bell
                 const isHighlighted = highlightId && (notif.id.toString() === highlightId.toString());
                 
                 return (
                   <div 
                     key={notif.id}
                     id={`notif-${notif.id}`}
-                    onClick={() => notif.type === 'chat' && handleNotificationClick(notif)}
+                    onClick={() => (notificationKind === 'chat' || notificationKind === 'thesis') && handleNotificationClick(notif)}
                     style={{
                       backgroundColor: isHighlighted ? '#FEF3C7' : (notif.isRead ? 'white' : '#F0FDF4'),
                       borderRadius: '16px',
@@ -627,7 +663,7 @@ function NotifikasiPage() {
                       gap: '12px',
                       transition: 'all 0.3s ease',
                       boxShadow: isHighlighted ? '0 4px 12px rgba(218, 188, 78, 0.3)' : 'none',
-                      cursor: notif.type === 'chat' ? 'pointer' : 'default'
+                      cursor: notificationKind === 'chat' || notificationKind === 'thesis' ? 'pointer' : 'default'
                     }}
                   >
                     <div style={{
@@ -649,14 +685,23 @@ function NotifikasiPage() {
                           borderRadius: '12px',
                           fontSize: '14px',
                           fontWeight: '600',
-                          backgroundColor: notif.type === 'chat' ? '#DABC4E' : '#015023',
+                          backgroundColor:
+                            notificationKind === 'chat'
+                              ? '#DABC4E'
+                              : notificationKind === 'thesis'
+                                ? '#16874B'
+                                : '#015023',
                           color: 'white',
                           display: 'flex',
                           alignItems: 'center',
                           gap: '6px'
                         }}>
                           <Icon size={14} />
-                          {notif.type === 'chat' ? 'Chat' : 'Pengumuman'}
+                          {notificationKind === 'chat'
+                            ? 'Chat'
+                            : notificationKind === 'thesis'
+                              ? 'Bimbingan TA'
+                              : 'Pengumuman'}
                         </span>
                       </div>
                     </div>
@@ -685,7 +730,7 @@ function NotifikasiPage() {
                         <span>{formatDate(notif.tanggal)}</span>
                       </div>
 
-                      {notif.type === 'announcement' && notif.metadata?.subject_name && (
+                      {notificationKind === 'announcement' && notif.metadata?.subject_name && (
                         <div style={{
                           marginBottom: '12px',
                           padding: '12px',
@@ -710,6 +755,42 @@ function NotifikasiPage() {
                         </div>
                       )}
 
+                      {notificationKind === 'thesis' && (
+                        <div style={{
+                          marginBottom: '12px',
+                          padding: '12px',
+                          backgroundColor: '#E8F7EE',
+                          borderRadius: '8px',
+                          borderLeft: '4px solid #16874B'
+                        }}>
+                          {notif.id_thesis_lecturer && (
+                            <p style={{ fontSize: '14px', color: '#015023', margin: '0 0 4px 0' }}>
+                              <strong>ID Permintaan:</strong> {notif.id_thesis_lecturer}
+                            </p>
+                          )}
+                          {notif.metadata?.student_name && (
+                            <p style={{ fontSize: '14px', color: '#015023', margin: '0 0 4px 0' }}>
+                              <strong>Mahasiswa:</strong> {notif.metadata.student_name}
+                            </p>
+                          )}
+                          {notif.metadata?.lecturer_name && (
+                            <p style={{ fontSize: '14px', color: '#015023', margin: '0 0 4px 0' }}>
+                              <strong>Dosen:</strong> {notif.metadata.lecturer_name}
+                            </p>
+                          )}
+                          {(notif.metadata?.thesis_status || notif.metadata?.consultation_status) && (
+                            <p style={{ fontSize: '14px', color: '#015023', margin: '0 0 4px 0' }}>
+                              <strong>Status:</strong> {notif.metadata.thesis_status || notif.metadata.consultation_status}
+                            </p>
+                          )}
+                          {thesisTarget && (
+                            <p style={{ fontSize: '14px', color: '#015023', margin: 0 }}>
+                              <strong>Aksi:</strong> {thesisTarget.label}
+                            </p>
+                          )}
+                        </div>
+                      )}
+
                       <p style={{
                         fontSize: '16px',
                         color: '#015023',
@@ -720,6 +801,17 @@ function NotifikasiPage() {
                       }}>
                         {notif.isi}
                       </p>
+
+                      {notificationKind === 'thesis' && thesisTarget && (
+                        <p style={{
+                          fontSize: '14px',
+                          color: '#16874B',
+                          fontWeight: '600',
+                          margin: '0 0 16px 0'
+                        }}>
+                          Klik kartu ini untuk {thesisTarget.label.toLowerCase()}.
+                        </p>
+                      )}
 
                       <div style={{
                         display: 'flex',
@@ -789,8 +881,8 @@ function NotifikasiPage() {
         open={showDeleteAllDialog}
         onOpenChange={setShowDeleteAllDialog}
         onConfirm={confirmDeleteAll}
-        title={`Hapus Semua ${filter === 'all' ? 'Notifikasi' : filter === 'announcement' ? 'Pengumuman' : 'Chat'}`}
-        description={`Apakah Anda yakin ingin menghapus SEMUA ${filter === 'all' ? 'notifikasi' : filter === 'announcement' ? 'pengumuman' : 'chat'}? Tindakan ini tidak dapat dibatalkan.`}
+        title={`Hapus Semua ${filter === 'all' ? 'Notifikasi' : getFilterLabel(filter)}`}
+        description={`Apakah Anda yakin ingin menghapus semua ${getFilterLabel(filter)}? Tindakan ini tidak dapat dibatalkan.`}
         confirmText="Ya, Hapus Semua"
         cancelText="Batal"
       />

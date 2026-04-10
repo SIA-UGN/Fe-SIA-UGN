@@ -6,6 +6,8 @@ export function middleware(req) {
   const { pathname } = req.nextUrl;
 
   const protectedRoutes = {
+    '/admin/bimbingan': ['admin', 'manager'],
+    '/admin/library': ['admin', 'manager'],
     '/adminpage': ['admin', 'manager'],
     '/adminpage/tambahmanager': ['admin'],
     '/dashboard': ['mahasiswa', 'dosen'],
@@ -15,10 +17,14 @@ export function middleware(req) {
     '/akademik/detailkelas/[kode]/pengumuman': ['dosen'],
     '/kehadiran': ['mahasiswa', 'dosen'],
     '/kehadiran/[kode]/pertemuan': ['dosen'],
+    '/bimbingan': ['mahasiswa'],
+    '/bimbingan-ta': ['mahasiswa', 'dosen'],
     '/notif': ['mahasiswa', 'dosen'],
+    '/library': ['mahasiswa', 'dosen', 'admin', 'manager'],
     '/persuratan/ajukan': ['mahasiswa', 'dosen'],
     '/persuratan/status': ['mahasiswa', 'dosen'],
     '/adminpage/persuratan': ['admin', 'manager'],
+    '/adminpage/thesis': ['admin', 'manager'],
     '/profilpage': ['mahasiswa', 'dosen', 'admin', 'manager']
   };
 

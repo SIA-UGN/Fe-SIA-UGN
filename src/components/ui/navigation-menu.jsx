@@ -1,10 +1,10 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback, Fragment, forwardRef } from "react"
+import { useState, useEffect, useCallback, forwardRef } from "react"
 import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter, usePathname } from 'next/navigation'
-import { User, UserCog, LogOut, Menu, X } from 'lucide-react'
+import { UserCog, LogOut, Menu, X } from 'lucide-react'
 import { cn } from "@/lib/utils"
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import {
@@ -19,9 +19,18 @@ import { AlertConfirmationRedDialog } from '@/components/ui/alert-dialog'
 import ChatModal from '@/components/ui/chatmodal'
 import NavbarNotification from '@/components/ui/navbar-notification'
 import PersuratanDropdown from '@/features/persuratan/components/PersuratanDropdown'
+<<<<<<< HEAD
 import BimbinganDropdown from '@/features/bimbingan-ta/components/BimbinganDropdown'
+=======
+import BimbinganDropdown from '@/features/bimbingan/components/BimbinganDropdown'
+import LibraryDropdown from '@/features/library/components/LibraryDropdown'
+>>>>>>> origin/tugasakhir
 import { useAuth } from '@/lib/auth-context'
 import { logout } from '@/lib/sessionApi'
+import { getCurrentRole, getThesisHomePath } from '@/features/bimbingan-ta/utils'
+
+const isMenuActive = (pathname, href) =>
+  pathname === href || pathname.startsWith(`${href}/`)
 
 const NavbarBrand = forwardRef(({ className, isScrolled, ...props }, ref) => (
   <Link
@@ -45,11 +54,15 @@ const NavbarBrand = forwardRef(({ className, isScrolled, ...props }, ref) => (
   </Link>
 ))
 
+<<<<<<< HEAD
 const NavbarMenu = forwardRef(({ className, isMobileMenuOpen, setIsMobileMenuOpen, ...props }, ref) => {
   const { user } = useAuth();
   const userRole = user?.roles;
 
   return (
+=======
+const NavbarMenu = forwardRef(({ className, isMobileMenuOpen, setIsMobileMenuOpen, thesisHref, role, ...props }, ref) => (
+>>>>>>> origin/tugasakhir
   <>
     {/* Desktop Menu */}
     <div
@@ -60,6 +73,12 @@ const NavbarMenu = forwardRef(({ className, isMobileMenuOpen, setIsMobileMenuOpe
       <NavbarMenuItem href="/akademik">Akademik</NavbarMenuItem>
       <NavbarMenuItem href="/kehadiran">Kehadiran</NavbarMenuItem>
       <NavbarMenuItem href="/hasil-studi">Hasil Studi</NavbarMenuItem>
+      {role === 'mahasiswa' || role === 'dosen' ? (
+        <BimbinganDropdown role={role} />
+      ) : (
+        <NavbarMenuItem href={thesisHref}>Bimbingan TA</NavbarMenuItem>
+      )}
+      <LibraryDropdown />
       <PersuratanDropdown />
       <BimbinganDropdown role={userRole} />
     </div>
@@ -110,6 +129,74 @@ const NavbarMenu = forwardRef(({ className, isMobileMenuOpen, setIsMobileMenuOpe
           onClick={() => setIsMobileMenuOpen(false)}
         >
           Hasil Studi
+        </MobileNavMenuItem>
+        {role === 'mahasiswa' ? (
+          <>
+            <MobileNavMenuItem
+              href="/bimbingan/pengajuan-ta"
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              Pengajuan TA
+            </MobileNavMenuItem>
+            <MobileNavMenuItem
+              href="/bimbingan/galeri-judul"
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              Galeri Judul TA
+            </MobileNavMenuItem>
+            <MobileNavMenuItem
+              href="/bimbingan/monitoring"
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              Monitoring
+            </MobileNavMenuItem>
+          </>
+        ) : role === 'dosen' ? (
+          <>
+            <MobileNavMenuItem
+              href="/bimbingan-ta/dosen/topik"
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              Kelola Judul TA
+            </MobileNavMenuItem>
+            <MobileNavMenuItem
+              href="/bimbingan-ta/dosen/permintaan"
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              Validasi Pengajuan
+            </MobileNavMenuItem>
+            <MobileNavMenuItem
+              href="/bimbingan-ta/dosen/bimbingan"
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              Monitoring Bimbingan
+            </MobileNavMenuItem>
+          </>
+        ) : (
+          <MobileNavMenuItem
+            href={thesisHref}
+            onClick={() => setIsMobileMenuOpen(false)}
+          >
+            Bimbingan TA
+          </MobileNavMenuItem>
+        )}
+        <MobileNavMenuItem
+          href="/library/books"
+          onClick={() => setIsMobileMenuOpen(false)}
+        >
+          Katalog Buku
+        </MobileNavMenuItem>
+        <MobileNavMenuItem
+          href="/library/activities"
+          onClick={() => setIsMobileMenuOpen(false)}
+        >
+          Aktivitas Perpustakaan
+        </MobileNavMenuItem>
+        <MobileNavMenuItem
+          href="/library/suggestions"
+          onClick={() => setIsMobileMenuOpen(false)}
+        >
+          Usulan Buku
         </MobileNavMenuItem>
         <MobileNavMenuItem
           href="/persuratan/ajukan"
@@ -185,7 +272,7 @@ const NavbarMenu = forwardRef(({ className, isMobileMenuOpen, setIsMobileMenuOpe
 
 const MobileNavMenuItem = forwardRef(({ className, href, children, onClick, ...props }, ref) => {
   const pathname = usePathname();
-  const isActive = pathname === href;
+  const isActive = isMenuActive(pathname, href);
 
   return (
     <Link
@@ -209,7 +296,7 @@ const MobileNavMenuItem = forwardRef(({ className, href, children, onClick, ...p
 
 const NavbarMenuItem = forwardRef(({ className, href, children, ...props }, ref) => {
   const pathname = usePathname();
-  const isActive = pathname === href;
+  const isActive = isMenuActive(pathname, href);
   const [isHovered, setIsHovered] = useState(false);
 
   return (
@@ -367,8 +454,11 @@ const NavbarProfile = forwardRef(({ className, userName, userImage, Name, isScro
 })
 
 const Navbar = forwardRef(({ className, ...props }, ref) => {
+  const { user } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const role = user.roles || getCurrentRole();
+  const thesisHref = role === 'mahasiswa' ? '/bimbingan/pengajuan-ta' : getThesisHomePath(role);
 
   // Handle scroll event for floating navbar
   useEffect(() => {
@@ -435,6 +525,8 @@ const Navbar = forwardRef(({ className, ...props }, ref) => {
               <NavbarMenu
                 isMobileMenuOpen={isMobileMenuOpen}
                 setIsMobileMenuOpen={setIsMobileMenuOpen}
+                thesisHref={thesisHref}
+                role={role}
               />
               <NavbarActions isScrolled={isScrolled} />
             </div>
