@@ -22,6 +22,9 @@ export default function DataTable({
   headerClassName = "text-white",
   nomertext = "No",
   isLoading = false,
+  flatTopCorners = false,
+  noRounded = false,
+  noShadow = false,
 }) {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
@@ -112,8 +115,17 @@ export default function DataTable({
     );
   };
 
+  const tableContainerClassName = `bg-white overflow-hidden ${noShadow ? '' : 'shadow-xl'}`.trim();
+  const tableBorderRadius = noRounded ? '0' : flatTopCorners ? '0 0 12px 12px' : '12px';
+
   return (
-    <div className="bg-white shadow-xl overflow-hidden" style={{ borderRadius: '12px', fontFamily: 'Urbanist, sans-serif' }}>
+    <div
+      className={tableContainerClassName}
+      style={{
+        borderRadius: tableBorderRadius,
+        fontFamily: 'Urbanist, sans-serif',
+      }}
+    >
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead className={headerClassName} style={{ backgroundColor: '#DABC4E' }}>

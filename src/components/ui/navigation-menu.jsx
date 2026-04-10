@@ -61,6 +61,9 @@ const NavbarMenu = forwardRef(({ className, isMobileMenuOpen, setIsMobileMenuOpe
       <NavbarMenuItem href="/akademik">Akademik</NavbarMenuItem>
       <NavbarMenuItem href="/kehadiran">Kehadiran</NavbarMenuItem>
       <NavbarMenuItem href="/hasil-studi">Hasil Studi</NavbarMenuItem>
+      {role === 'mahasiswa' && (
+        <NavbarMenuItem href="/krsmahasiswa">Pengisian KRS</NavbarMenuItem>
+      )}
       {role === 'mahasiswa' || role === 'dosen' ? (
         <BimbinganDropdown role={role} />
       ) : (
@@ -117,6 +120,14 @@ const NavbarMenu = forwardRef(({ className, isMobileMenuOpen, setIsMobileMenuOpe
         >
           Hasil Studi
         </MobileNavMenuItem>
+        {role === 'mahasiswa' && (
+          <MobileNavMenuItem
+            href="/krsmahasiswa"
+            onClick={() => setIsMobileMenuOpen(false)}
+          >
+            Pengisian KRS
+          </MobileNavMenuItem>
+        )}
         {role === 'mahasiswa' ? (
           <>
             <MobileNavMenuItem
