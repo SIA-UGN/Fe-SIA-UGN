@@ -9,7 +9,7 @@ import Footer from '@/components/ui/footer'
 import { useDashboardStats } from '@/features/admin-dashboard/hooks/useDashboardStats'
 import Cookies from 'js-cookie'
 import { ErrorMessageBoxWithButton } from '@/components/ui/message-box'
-import { GraduationCap, Megaphone, Mail } from 'lucide-react'
+import { GraduationCap, Megaphone, Mail, SquareLibrary } from 'lucide-react'
 
 // Icons - using icons from /public/icon folder
 const PlusIcon = () => (
@@ -139,6 +139,9 @@ export default function AdminDashboard() {
       case 'manage-thesis':
         router.push('/admin/bimbingan');
         break;
+      case 'manage-library':
+        router.push('/admin/library');
+        break;
       default:
         console.log('Unknown action type');
     }
@@ -215,6 +218,13 @@ export default function AdminDashboard() {
       description: 'Pantau pengajuan, pembimbing, topik, dan konsultasi tugas akhir',
       icon: <GraduationCap className="w-8 h-8" />,
       action: () => handleCardClick('manage-thesis')
+    },
+    {
+      id: 'manage-library',
+      title: 'Manajemen Perpustakaan',
+      description: 'Kelola katalog buku, peminjaman, dan usulan koleksi perpustakaan',
+      icon: <SquareLibrary className="w-8 h-8" />,
+      action: () => handleCardClick('manage-library')
     },
   ];
 

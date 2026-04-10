@@ -7,6 +7,7 @@ export function middleware(req) {
 
   const protectedRoutes = {
     '/admin/bimbingan': ['admin', 'manager'],
+    '/admin/library': ['admin', 'manager'],
     '/adminpage': ['admin', 'manager'],
     '/adminpage/tambahmanager': ['admin'],
     '/dashboard': ['mahasiswa', 'dosen'],
@@ -19,6 +20,7 @@ export function middleware(req) {
     '/bimbingan': ['mahasiswa'],
     '/bimbingan-ta': ['mahasiswa', 'dosen'],
     '/notif': ['mahasiswa', 'dosen'],
+    '/library': ['mahasiswa', 'dosen', 'admin', 'manager'],
     '/persuratan/ajukan': ['mahasiswa', 'dosen'],
     '/persuratan/status': ['mahasiswa', 'dosen'],
     '/adminpage/persuratan': ['admin', 'manager'],

@@ -20,6 +20,7 @@ import ChatModal from '@/components/ui/chatmodal'
 import NavbarNotification from '@/components/ui/navbar-notification'
 import PersuratanDropdown from '@/features/persuratan/components/PersuratanDropdown'
 import BimbinganDropdown from '@/features/bimbingan/components/BimbinganDropdown'
+import LibraryDropdown from '@/features/library/components/LibraryDropdown'
 import { useAuth } from '@/lib/auth-context'
 import { logout } from '@/lib/sessionApi'
 import { getCurrentRole, getThesisHomePath } from '@/features/bimbingan-ta/utils'
@@ -65,6 +66,7 @@ const NavbarMenu = forwardRef(({ className, isMobileMenuOpen, setIsMobileMenuOpe
       ) : (
         <NavbarMenuItem href={thesisHref}>Bimbingan TA</NavbarMenuItem>
       )}
+      <LibraryDropdown />
       <PersuratanDropdown />
     </div>
 
@@ -165,6 +167,24 @@ const NavbarMenu = forwardRef(({ className, isMobileMenuOpen, setIsMobileMenuOpe
             Bimbingan TA
           </MobileNavMenuItem>
         )}
+        <MobileNavMenuItem
+          href="/library/books"
+          onClick={() => setIsMobileMenuOpen(false)}
+        >
+          Katalog Buku
+        </MobileNavMenuItem>
+        <MobileNavMenuItem
+          href="/library/activities"
+          onClick={() => setIsMobileMenuOpen(false)}
+        >
+          Aktivitas Perpustakaan
+        </MobileNavMenuItem>
+        <MobileNavMenuItem
+          href="/library/suggestions"
+          onClick={() => setIsMobileMenuOpen(false)}
+        >
+          Usulan Buku
+        </MobileNavMenuItem>
         <MobileNavMenuItem
           href="/persuratan/ajukan"
           onClick={() => setIsMobileMenuOpen(false)}
