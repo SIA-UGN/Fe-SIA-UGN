@@ -158,7 +158,7 @@ export default function DosenSuperviseesPage() {
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
   const [noteForm, setNoteForm] = useState(DEFAULT_NOTE_FORM);
   const [scheduleForm, setScheduleForm] = useState(DEFAULT_SCHEDULE_FORM);
-  const [formErrors, setFormErrors] = useState({});
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
 
   const fetchSupervisees = useCallback(async () => {
@@ -247,7 +247,7 @@ export default function DosenSuperviseesPage() {
     event.preventDefault();
     if (!selectedSupervisee) return;
 
-    const nextErrors = {};
+    const nextErrors: Record<string, string> = {};
     if (!noteForm.subject.trim()) nextErrors.subject = 'Topik pembahasan wajib diisi';
     setFormErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
@@ -280,7 +280,7 @@ export default function DosenSuperviseesPage() {
     event.preventDefault();
     if (!selectedSupervisee) return;
 
-    const nextErrors = {};
+    const nextErrors: Record<string, string> = {};
     if (!scheduleForm.consultation_date) nextErrors.consultation_date = 'Tanggal wajib diisi';
     if (!scheduleForm.subject.trim()) nextErrors.schedule_subject = 'Topik pembahasan wajib diisi';
     setFormErrors(nextErrors);

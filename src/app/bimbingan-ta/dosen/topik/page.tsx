@@ -142,7 +142,7 @@ export default function DosenTopicsPage() {
   const [editingTopic, setEditingTopic] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState(DEFAULT_FORM);
-  const [formErrors, setFormErrors] = useState({});
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -195,7 +195,7 @@ export default function DosenTopicsPage() {
   }, [searchInput]);
 
   const categoryMap = useMemo(() => {
-    const map = {};
+    const map: Record<string, string> = {};
     categories.forEach((category) => {
       map[category.id_thesis_category] = category.name;
     });
@@ -270,7 +270,7 @@ export default function DosenTopicsPage() {
   };
 
   const validateForm = () => {
-    const nextErrors = {};
+    const nextErrors: Record<string, string> = {};
 
     if (!form.title_ind.trim()) nextErrors.title_ind = 'Judul wajib diisi';
     if (!form.id_thesis_category) nextErrors.id_thesis_category = 'Kategori wajib dipilih';
