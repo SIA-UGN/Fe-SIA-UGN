@@ -16,6 +16,7 @@ import {
 } from '../mockData';
 
 const KRS_DRAFT_STORAGE_KEY = 'krs-mahasiswa-draft-selection';
+const KRS_SUBMISSION_STORAGE_KEY = 'krs-mahasiswa-last-submission';
 
 function formatTime(value) {
   if (!value) {
@@ -78,6 +79,32 @@ function clearDraftStorage() {
   sessionStorage.removeItem(KRS_DRAFT_STORAGE_KEY);
 }
 
+function saveSubmissionToStorage(payload) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  sessionStorage.setItem(KRS_SUBMISSION_STORAGE_KEY, JSON.stringify(payload));
+}
+
+function readSubmissionFromStorage() {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  try {
+    const raw = sessionStorage.getItem(KRS_SUBMISSION_STORAGE_KEY);
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' && parsed.is_submitted === true ? parsed : null;
+  } catch (_error) {
+    return null;
+  }
+}
+
 function calculateTotalSks(items = []) {
   return items.reduce((acc, item) => acc + Number(item?.sks || 0), 0);
 }
@@ -112,14 +139,22 @@ export default function ReviewKrsPage() {
   const [quota] = useState(MOCK_KRS_QUOTA);
   const [draftSelection, setDraftSelection] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isAlreadySubmitted, setIsAlreadySubmitted] = useState(false);
 
   useEffect(() => {
+    const existingSubmission = readSubmissionFromStorage();
+    if (existingSubmission) {
+      setIsAlreadySubmitted(true);
+      router.replace('/krsmahasiswa/status');
+      return;
+    }
+
     const draftItems = readDraftFromStorage();
     const seededDraft = draftItems.length > 0 ? draftItems : buildMockDraftSelection();
 
     setDraftSelection(seededDraft);
     saveDraftToStorage(seededDraft);
-  }, []);
+  }, [router]);
 
   const draftTotalSks = useMemo(() => calculateTotalSks(draftSelection), [draftSelection]);
 
@@ -144,6 +179,12 @@ export default function ReviewKrsPage() {
   };
 
   const handleSubmitKrs = async () => {
+    if (isAlreadySubmitted || readSubmissionFromStorage()) {
+      toast.info('KRS sudah diajukan. Lihat Status KRS untuk detailnya.');
+      router.push('/krsmahasiswa/status');
+      return;
+    }
+
     if (draftSelection.length === 0) {
       toast.error('Belum ada mata kuliah untuk diajukan.');
       return;
@@ -155,11 +196,27 @@ export default function ReviewKrsPage() {
       setTimeout(resolve, 500);
     });
 
+    const submittedAt = new Date().toISOString();
+    const submissionPayload = {
+      id_submission: `MOCK-KRS-${Date.now()}`,
+      is_submitted: true,
+      academic_period: quota?.academic_period?.name || '-',
+      advisor_name: 'Dr. Ahmad Fauzi, M.Kom',
+      status: 'pending',
+      submitted_at: submittedAt,
+      courses: draftSelection.map((item, index) => ({
+        ...item,
+        jenis: item?.jenis || (index === 0 ? 'Wajib' : 'Pilihan'),
+        status: 'pending',
+      })),
+    };
+
+    saveSubmissionToStorage(submissionPayload);
     clearDraftStorage();
     setDraftSelection([]);
-    toast.success('Pengajuan KRS berhasil (mode slicing/mock).');
+    toast.success('Pengajuan KRS berhasil dikirim.');
     setIsSubmitting(false);
-    router.push('/krsmahasiswa');
+    router.push('/krsmahasiswa/status');
   };
 
   const tableColumns = [
@@ -315,9 +372,9 @@ export default function ReviewKrsPage() {
                   onClick={handleSubmitKrs}
                   className="h-11 px-6 text-sm font-semibold"
                   style={{ backgroundColor: '#015023' }}
-                  disabled={isSubmitting || draftSelection.length === 0}
+                  disabled={isSubmitting || draftSelection.length === 0 || isAlreadySubmitted}
                 >
-                  {isSubmitting ? 'Memproses...' : 'Ajukan KRS'}
+                  {isSubmitting ? 'Memproses...' : isAlreadySubmitted ? 'Sudah Diajukan' : 'Ajukan KRS'}
                 </Button>
               </div>
             </div>

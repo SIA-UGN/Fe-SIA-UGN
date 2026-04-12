@@ -20,6 +20,7 @@ export default function DataTable({
   onActivate,
   customRender = {},
   headerClassName = "text-white",
+  headerBackgroundColor = "#DABC4E",
   nomertext = "No",
   isLoading = false,
   flatTopCorners = false,
@@ -128,7 +129,7 @@ export default function DataTable({
     >
       <div className="overflow-x-auto">
         <table className="w-full">
-          <thead className={headerClassName} style={{ backgroundColor: '#DABC4E' }}>
+          <thead className={headerClassName} style={{ backgroundColor: headerBackgroundColor }}>
             <tr className="hover:bg-transparent">
               {/* Number column */}
               <th className="text-center font-semibold w-16 p-4" style={{ 

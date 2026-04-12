@@ -1128,7 +1128,7 @@ return (
                 type="text"
                 id="nik"
                 name="nik"
-                value={profileData.nik}
+                value={profileData.nik ?? ''}
                 onChange={handleChange}
                 maxLength="16"
                 className="w-full px-4 py-3 border-2 focus:outline-none focus:border-opacity-100"
@@ -1160,7 +1160,7 @@ return (
                 type="text"
                 id="nomor_kartu_keluarga"
                 name="nomor_kartu_keluarga"
-                value={profileData.nomor_kartu_keluarga}
+                value={profileData.nomor_kartu_keluarga ?? ''}
                 onChange={handleChange}
                 maxLength="16"
                 className="w-full px-4 py-3 border-2 focus:outline-none focus:border-opacity-100"

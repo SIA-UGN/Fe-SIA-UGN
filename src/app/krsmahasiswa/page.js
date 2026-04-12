@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
 	BookOpenText,
 	CalendarDays,
@@ -15,6 +15,26 @@ import Footer from '@/components/ui/footer';
 import { Button } from '@/components/ui/button';
 import DataTable from '@/components/ui/table';
 import { MOCK_KRS_QUOTA } from './mockData';
+
+const KRS_SUBMISSION_STORAGE_KEY = 'krs-mahasiswa-last-submission';
+
+function hasSubmittedKrs() {
+	if (typeof window === 'undefined') {
+		return false;
+	}
+
+	try {
+		const raw = sessionStorage.getItem(KRS_SUBMISSION_STORAGE_KEY);
+		if (!raw) {
+			return false;
+		}
+
+		const parsed = JSON.parse(raw);
+		return Boolean(parsed && typeof parsed === 'object' && parsed.is_submitted === true);
+	} catch (_error) {
+		return false;
+	}
+}
 
 function formatDate(value) {
 	if (!value) {
@@ -62,10 +82,15 @@ function getSessionStatusStyle(status) {
 }
 
 export default function KrsMahasiswaPage() {
+	const [isAlreadySubmitted, setIsAlreadySubmitted] = useState(false);
 	const quota = MOCK_KRS_QUOTA;
 
 	const activeSession = quota?.active_session ?? null;
 	const isSessionOpen = activeSession?.status === 'open';
+
+	useEffect(() => {
+		setIsAlreadySubmitted(hasSubmittedKrs());
+	}, []);
 
 	const progress = useMemo(() => {
 		const used = Number(quota?.sks_used ?? 0);
@@ -90,7 +115,7 @@ export default function KrsMahasiswaPage() {
 		{ key: 'sesi', label: 'Sesi' },
 		{ key: 'tanggal_mulai', label: 'Tanggal Mulai', width: '180px' },
 		{ key: 'status', label: 'Status', width: '170px' },
-		{ key: 'aksi', label: 'Aksi', width: '160px' },
+		{ key: 'aksi', label: 'Aksi', width: '320px' },
 	];
 
 	const sessionRender = {
@@ -110,24 +135,31 @@ export default function KrsMahasiswaPage() {
 				{getSessionStatusLabel(value)}
 			</span>
 		),
-		aksi: () =>
-			isSessionOpen ? (
-				<Button
-					asChild
-					className="h-10 px-4 text-sm font-semibold"
-					style={{ backgroundColor: '#015023' }}
-				>
-					<Link href="/krsmahasiswa/pilih">Mulai Isi</Link>
+		aksi: () => (
+			<div className="flex items-center justify-center gap-2 flex-wrap">
+				<Button asChild variant="outline" className="h-10 px-4 text-sm font-semibold">
+					<Link href="/krsmahasiswa/status">Status KRS</Link>
 				</Button>
-			) : (
-				<Button
-					disabled
-					className="h-10 px-4 text-sm font-semibold"
-					style={{ backgroundColor: '#6B7280' }}
-				>
-					Mulai Isi
-				</Button>
-			),
+
+				{isSessionOpen && !isAlreadySubmitted ? (
+					<Button
+						asChild
+						className="h-10 px-4 text-sm font-semibold"
+						style={{ backgroundColor: '#015023' }}
+					>
+						<Link href="/krsmahasiswa/pilih">Mulai Isi</Link>
+					</Button>
+				) : (
+					<Button
+						disabled
+						className="h-10 px-4 text-sm font-semibold"
+						style={{ backgroundColor: '#6B7280' }}
+					>
+						{isAlreadySubmitted ? 'Sudah Diajukan' : 'Mulai Isi'}
+					</Button>
+				)}
+			</div>
+		),
 	};
 
 	return (
@@ -234,7 +266,7 @@ export default function KrsMahasiswaPage() {
 						<div className="px-6 py-5 border-b" style={{ borderColor: '#E5E7EB' }}>
 							<h2 className="text-2xl font-bold" style={{ color: '#015023' }}>Jadwal Pengisian KRS</h2>
 							<p className="text-sm mt-1" style={{ color: '#6B7280' }}>
-								Klik tombol mulai untuk masuk ke proses pemilihan mata kuliah.
+								Gunakan tombol Status KRS untuk melihat progres pengajuan dan Mulai Isi saat sesi terbuka.
 							</p>
 						</div>
 
