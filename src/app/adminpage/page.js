@@ -9,7 +9,7 @@ import Footer from '@/components/ui/footer'
 import { useDashboardStats } from '@/features/admin-dashboard/hooks/useDashboardStats'
 import Cookies from 'js-cookie'
 import { ErrorMessageBoxWithButton } from '@/components/ui/message-box'
-import { GraduationCap, Megaphone, Mail, SquareLibrary } from 'lucide-react'
+import { GraduationCap, Megaphone, Mail, SquareLibrary, Clock, ClipboardCheck } from 'lucide-react'
 
 // Icons - using icons from /public/icon folder
 const PlusIcon = () => (
@@ -143,6 +143,12 @@ export default function AdminDashboard() {
       case 'manage-library':
         router.push('/admin/library');
         break;
+      case 'manage-krs-time':
+        router.push('/adminpage/kelolawaktukrs');
+        break;
+      case 'approval-krs':
+        router.push('/adminpage/approvalKRS');
+        break;
       default:
         console.log('Unknown action type');
     }
@@ -226,6 +232,20 @@ export default function AdminDashboard() {
       description: 'Kelola katalog buku, peminjaman, dan usulan koleksi perpustakaan',
       icon: <SquareLibrary className="w-8 h-8" />,
       action: () => handleCardClick('manage-library')
+    },
+    {
+      id: 'manage-krs-time',
+      title: 'Kelola Waktu KRS',
+      description: 'Atur jadwal pembukaan dan penutupan pengisian KRS untuk setiap semester',
+      icon: <Clock className="w-8 h-8" />,
+      action: () => handleCardClick('manage-krs-time')
+    },
+    {
+      id: 'approval-krs',
+      title: 'Approval KRS',
+      description: 'Tinjau dan setujui pengajuan KRS mahasiswa setiap semester',
+      icon: <ClipboardCheck className="w-8 h-8" />,
+      action: () => handleCardClick('approval-krs')
     },
   ];
 
