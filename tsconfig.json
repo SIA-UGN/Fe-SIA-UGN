@@ -19,7 +19,9 @@
     "jsx": "preserve",
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": [
+        "./src/*"
+      ]
     },
     "plugins": [
       {
@@ -31,8 +33,15 @@
     "next-env.d.ts",
     ".next/types/**/*.ts",
     "**/*.ts",
-    "**/*.tsx"
-  ],
+    "**/*.tsx",
+    "src/app/adminpage/thesis/consultations/[id}/page.js",
+    "src/app/adminpage/thesis/consultations/[id]/page.js",
+    "src/app/adminpage/thesis/students/page.js",
+    "src/app/adminpage/thesis/supervisors/page.js",
+    "src/app/adminpage/thesis/page.tsx",
+    "src/app/adminpage/thesis/users/page.js",
+    "src/app/adminpage/thesis/consultations/page..js"
+, "src/app/adminpage/thesis/consultations/page.js", "src/app/adminpage/page.js"  ],
   "exclude": [
     "node_modules"
   ]

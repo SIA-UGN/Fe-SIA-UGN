@@ -45,6 +45,20 @@ export const getPrograms = async () => {
 };
 
 /**
+ * Store new program
+ * @param {Object} programData - Data program studi baru
+ * @returns {Promise} Response hasil create
+ */
+export const storeProgram = async (programData) => {
+  try {
+    const response = await api.post('/manager/programs', programData);
+    return response.data;
+  } catch (error) {
+    throw (error.response?.data ?? error);
+  }
+};
+
+/**
  * Get all subjects
  * @returns {Promise} Response dengan data subjects
  */

@@ -1,9 +1,12 @@
 import api from '@/lib/axios';
 import { getPrograms } from '@/lib/adminApi';
+import { getSubjects } from '@/lib/adminApi';
 import { getProfile, getStaffProfile } from '@/lib/profileApi';
 import {
   buildFormData,
+  dedupeProgramOptions,
   getProgramCandidatesFromPayload,
+  resolveProgramIdFromPayload,
   mapProgramsToOptions,
   normalizeApiError,
   unwrapResponseData,
@@ -237,8 +240,13 @@ export const lecturerThesisApi = {
 
     try {
       const profile = await getProfile();
-      if (profile?.data) {
-        candidates.push(...getProgramCandidatesFromPayload(profile.data));
+      const profileData = profile?.data?.data || profile?.data || profile;
+      if (profileData) {
+        const resolvedId = resolveProgramIdFromPayload(profileData);
+        if (resolvedId) {
+          candidates.push({ id_program: resolvedId, name: profileData?.program?.name || `Program ${resolvedId}` });
+        }
+        candidates.push(...getProgramCandidatesFromPayload(profileData));
       }
     } catch (_error) {
       // Fallback below.
@@ -246,20 +254,107 @@ export const lecturerThesisApi = {
 
     try {
       const staffProfile = await getStaffProfile();
-      if (staffProfile?.data) {
-        candidates.push(...getProgramCandidatesFromPayload(staffProfile.data));
+      const staffProfileData = staffProfile?.data?.data || staffProfile?.data || staffProfile;
+      if (staffProfileData) {
+        const resolvedId = resolveProgramIdFromPayload(staffProfileData);
+        if (resolvedId) {
+          candidates.push({
+            id_program: resolvedId,
+            name: staffProfileData?.program?.name || `Program ${resolvedId}`,
+          });
+        }
+        candidates.push(...getProgramCandidatesFromPayload(staffProfileData));
       }
     } catch (_error) {
       // Ignore if unavailable.
     }
 
-    const unique = new Map<number, ProgramOption>();
-    candidates.forEach((item) => {
-      if (!unique.has(item.id_program)) {
-        unique.set(item.id_program, item);
-      }
-    });
+    if (candidates.length === 0) {
+      try {
+        const topicsResponse = await api.get('/lecturer/thesis/topics');
+        const topics = unwrapResponseData<any[]>(topicsResponse.data) || [];
 
-    return Array.from(unique.values());
+        topics.forEach((topic) => {
+          const idProgram = Number(topic?.id_program || topic?.program?.id_program || topic?.program?.id);
+          const name = topic?.program?.name || topic?.program_name;
+          if (Number.isFinite(idProgram) && name) {
+            candidates.push({ id_program: idProgram, name });
+          }
+        });
+      } catch (_error) {
+        // Ignore if unavailable.
+      }
+    }
+
+    return dedupeProgramOptions(candidates);
+  },
+
+  async getSubjects() {
+    try {
+      const response = await getSubjects();
+      const rawList = Array.isArray(response?.data)
+        ? response.data
+        : Array.isArray(response?.data?.data)
+          ? response.data.data
+          : Array.isArray(response)
+            ? response
+            : Array.isArray(response?.data)
+              ? response.data
+              : [];
+
+      const normalizedFromManager = rawList
+        .map((subject) => ({
+          id_subject: Number(subject?.id_subject || subject?.id),
+          name_subject: subject?.name_subject || subject?.name || '',
+          code_subject: subject?.code_subject || subject?.code || null,
+          sks: Number(subject?.sks || 0) || null,
+        }))
+        .filter((subject) => Number.isFinite(subject.id_subject) && subject.name_subject);
+
+      if (normalizedFromManager.length > 0) {
+        return normalizedFromManager;
+      }
+
+      try {
+        const lecturerClassesResponse = await api.get('/lecturer/classes');
+        const classList = Array.isArray(lecturerClassesResponse?.data?.data)
+          ? lecturerClassesResponse.data.data
+          : Array.isArray(lecturerClassesResponse?.data)
+            ? lecturerClassesResponse.data
+            : [];
+
+        const extractedSubjects = classList
+          .map((item) => item?.subject || item)
+          .map((subject) => ({
+            id_subject: Number(subject?.id_subject || subject?.id),
+            name_subject: subject?.name_subject || subject?.name || '',
+            code_subject: subject?.code_subject || subject?.code || null,
+            sks: Number(subject?.sks || 0) || null,
+          }))
+          .filter((subject) => Number.isFinite(subject.id_subject) && subject.name_subject);
+
+        const uniqueMap = new Map();
+        extractedSubjects.forEach((subject) => {
+          if (!uniqueMap.has(subject.id_subject)) {
+            uniqueMap.set(subject.id_subject, subject);
+          }
+        });
+
+        return Array.from(uniqueMap.values());
+      } catch (_fallbackError) {
+        return [];
+      }
+    } catch (error) {
+      throw normalizeApiError(error);
+    }
+  },
+
+  async createProgram(payload: { name: string }) {
+    try {
+      const response = await api.post('/manager/programs', payload);
+      return response.data;
+    } catch (error) {
+      throw normalizeApiError(error);
+    }
   },
 };

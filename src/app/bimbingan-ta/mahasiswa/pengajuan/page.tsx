@@ -13,6 +13,7 @@ import ThesisSectionCard from '@/features/bimbingan-ta/components/ThesisSectionC
 import ThesisStatusBadge from '@/features/bimbingan-ta/components/ThesisStatusBadge';
 import ThesisQuotaMeter from '@/features/bimbingan-ta/components/ThesisQuotaMeter';
 import ThesisAttachmentLink from '@/features/bimbingan-ta/components/ThesisAttachmentLink';
+import ThesisKeyValueList from '@/features/bimbingan-ta/components/ThesisKeyValueList';
 import ThesisLoadingBlock from '@/features/bimbingan-ta/components/ThesisLoadingBlock';
 import ThesisEmptyState from '@/features/bimbingan-ta/components/ThesisEmptyState';
 import StudentThesisForm from '@/features/bimbingan-ta/components/forms/StudentThesisForm';
@@ -39,6 +40,8 @@ export default function MahasiswaThesisSubmissionPage() {
   const [isRequesting, setIsRequesting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showRequestForm, setShowRequestForm] = useState(false);
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -71,6 +74,12 @@ export default function MahasiswaThesisSubmissionPage() {
     return () => clearTimeout(timer);
   }, [successMessage]);
 
+  useEffect(() => {
+    if (thesis) {
+      setShowCreateForm(false);
+    }
+  }, [thesis]);
+
   const activeRequestCount = useMemo(
     () => countActiveRequests(requests.map((item) => item.status)),
     [requests],
@@ -84,6 +93,21 @@ export default function MahasiswaThesisSubmissionPage() {
     [requests],
   );
 
+  const canRequestLecturer = useMemo(() => {
+    return Boolean(thesis && thesis.status === 'proposing' && activeRequestCount < 4);
+  }, [thesis, activeRequestCount]);
+
+  const requestGuardMessage = useMemo(() => {
+    if (!thesis) return 'Pengajuan TA belum tersedia untuk mengajukan pembimbing.';
+    if (thesis.status !== 'proposing') {
+      return 'Permintaan pembimbing hanya dapat diajukan saat status TA masih proposing.';
+    }
+    if (activeRequestCount >= 4) {
+      return 'Anda sudah mencapai batas maksimal 4 permintaan pembimbing aktif.';
+    }
+    return null;
+  }, [thesis, activeRequestCount]);
+
   const handleCreateOrUpdate = async (payload: StudentThesisPayload) => {
     setIsSaving(true);
     setFormError(null);
@@ -94,10 +118,21 @@ export default function MahasiswaThesisSubmissionPage() {
       } else {
         await studentThesisApi.createThesis(payload);
         setSuccessMessage('Pengajuan TA berhasil dibuat.');
+        setShowCreateForm(false);
       }
       await fetchData();
     } catch (err: any) {
-      setFormError(err?.userMessage || err?.message || 'Gagal menyimpan pengajuan.');
+      const message = err?.userMessage || err?.message || 'Gagal menyimpan pengajuan.';
+      if (
+        !thesis &&
+        typeof message === 'string' &&
+        message.toLowerCase().includes('sudah memiliki pengajuan tugas akhir')
+      ) {
+        setSuccessMessage('Anda sudah memiliki pengajuan tugas akhir. Data diperbarui.');
+        await fetchData();
+      } else {
+        setFormError(message);
+      }
     } finally {
       setIsSaving(false);
     }
@@ -121,14 +156,33 @@ export default function MahasiswaThesisSubmissionPage() {
 
   const handleRequestLecturer = async (payload: { id_lecturer: number; student_note?: string }) => {
     if (!thesis) return;
+
+    if (!canRequestLecturer) {
+      setRequestError(requestGuardMessage || 'Permintaan pembimbing belum dapat diajukan.');
+      return;
+    }
+
     setIsRequesting(true);
     setRequestError(null);
     try {
       await studentThesisApi.requestLecturer(thesis.id_student_thesis, payload);
       setSuccessMessage('Permintaan pembimbing berhasil dikirim.');
+      setShowRequestForm(false);
       await fetchData();
     } catch (err: any) {
-      setRequestError(err?.userMessage || err?.message || 'Gagal mengirim permintaan pembimbing.');
+      const message = err?.userMessage || err?.message || 'Gagal mengirim permintaan pembimbing.';
+      const normalizedMessage = typeof message === 'string' ? message.toLowerCase() : '';
+
+      if (normalizedMessage.includes('batas maksimal permintaan aktif')) {
+        setRequestError('Anda sudah mencapai batas maksimal 4 permintaan aktif.');
+      } else if (
+        normalizedMessage.includes('sudah memiliki permintaan aktif') ||
+        normalizedMessage.includes('sudah pernah diajukan')
+      ) {
+        setRequestError('Dosen ini sudah memiliki permintaan aktif dari Anda.');
+      } else {
+        setRequestError(message);
+      }
     } finally {
       setIsRequesting(false);
     }
@@ -192,22 +246,35 @@ export default function MahasiswaThesisSubmissionPage() {
                   ) : null
                 }
               >
+                <ThesisKeyValueList
+                  items={[
+                    { label: 'Judul Indonesia', value: thesis.title_ind },
+                    { label: 'Judul Inggris', value: thesis.title_eng || '-' },
+                    { label: 'Topik', value: thesis.topic || thesis.thesis_topic?.topic || '-' },
+                    { label: 'Program Studi', value: thesis.program?.name || '-' },
+                    { label: 'Status', value: <ThesisStatusBadge status={thesis.status} /> },
+                    { label: 'Dibuat', value: formatDate(thesis.created_at) },
+                  ]}
+                />
+
                 {thesis.status === 'proposing' ? (
-                  <StudentThesisForm
-                    initialValues={{
-                      title_ind: thesis.title_ind,
-                      title_eng: thesis.title_eng || '',
-                      topic: thesis.topic || '',
-                      description: thesis.description || '',
-                    }}
-                    currentAttachment={thesis.attachment_proposal}
-                    isSubmitting={isSaving}
-                    submitError={formError}
-                    submitLabel="Perbarui Pengajuan"
-                    onSubmit={handleCreateOrUpdate}
-                  />
+                  <div className="mt-5">
+                    <StudentThesisForm
+                      initialValues={{
+                        title_ind: thesis.title_ind,
+                        title_eng: thesis.title_eng || '',
+                        topic: thesis.topic || '',
+                        description: thesis.description || '',
+                      }}
+                      currentAttachment={thesis.attachment_proposal}
+                      isSubmitting={isSaving}
+                      submitError={formError}
+                      submitLabel="Perbarui Pengajuan"
+                      onSubmit={handleCreateOrUpdate}
+                    />
+                  </div>
                 ) : (
-                  <div className="space-y-4">
+                  <div className="mt-5 space-y-4">
                     <p className="text-sm text-gray-600">{thesis.description || 'Tidak ada deskripsi.'}</p>
                     <ThesisAttachmentLink path={thesis.attachment_proposal} label="Buka proposal aktif" />
                     <p className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
@@ -221,14 +288,31 @@ export default function MahasiswaThesisSubmissionPage() {
                 <ThesisSectionCard
                   title="Ajukan Pembimbing"
                   description="Kirim permintaan ke dosen yang belum memiliki request aktif."
+                  actions={
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowRequestForm((prev) => !prev)}
+                      disabled={!canRequestLecturer}
+                    >
+                      {showRequestForm ? 'Tutup Form' : 'Ajukan Pembimbing Baru'}
+                    </Button>
+                  }
                 >
-                  <StudentLecturerRequestForm
-                    lecturers={lecturers}
-                    disabledLecturerIds={activeLecturerIds}
-                    isSubmitting={isRequesting}
-                    submitError={requestError}
-                    onSubmit={handleRequestLecturer}
-                  />
+                  {!canRequestLecturer && requestGuardMessage ? (
+                    <p className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+                      {requestGuardMessage}
+                    </p>
+                  ) : null}
+
+                  {showRequestForm && canRequestLecturer ? (
+                    <StudentLecturerRequestForm
+                      lecturers={lecturers}
+                      disabledLecturerIds={activeLecturerIds}
+                      isSubmitting={isRequesting}
+                      submitError={requestError}
+                      onSubmit={handleRequestLecturer}
+                    />
+                  ) : null}
                 </ThesisSectionCard>
 
                 <ThesisSectionCard
@@ -264,17 +348,23 @@ export default function MahasiswaThesisSubmissionPage() {
           ) : (
             <div className="space-y-6">
               <ThesisEmptyState
-                title="Belum ada pengajuan aktif"
-                description="Isi formulir berikut untuk mengajukan proposal tugas akhir secara mandiri."
+                title="Belum ada pengajuan TA"
+                description="Anda bisa membuat pengajuan TA secara mandiri atau memilih topik dari dosen."
+                actionLabel={showCreateForm ? 'Tutup Form Mandiri' : 'Buat Pengajuan Mandiri'}
+                onAction={() => setShowCreateForm((prev) => !prev)}
               />
-              <ThesisSectionCard title="Form Pengajuan Baru" description="Proposal mandiri hanya dapat dibuat sekali selama masih aktif.">
-                <StudentThesisForm
-                  isSubmitting={isSaving}
-                  submitError={formError}
-                  submitLabel="Buat Pengajuan TA"
-                  onSubmit={handleCreateOrUpdate}
-                />
-              </ThesisSectionCard>
+
+              {showCreateForm ? (
+                <ThesisSectionCard title="Form Pengajuan Baru" description="Proposal mandiri hanya dapat dibuat sekali selama masih aktif.">
+                  <StudentThesisForm
+                    isSubmitting={isSaving}
+                    submitError={formError}
+                    submitLabel="Buat Pengajuan TA"
+                    onSubmit={handleCreateOrUpdate}
+                    onCancel={() => setShowCreateForm(false)}
+                  />
+                </ThesisSectionCard>
+              ) : null}
             </div>
           )}
         </div>

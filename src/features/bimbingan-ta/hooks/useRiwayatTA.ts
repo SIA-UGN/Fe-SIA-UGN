@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { taService, type PengajuanTA } from '@/services/taService';
+import { studentThesisApi } from '@/features/bimbingan-ta/api/student';
+import type { StudentThesis } from '@/features/bimbingan-ta/types';
 
-export function useRiwayatTA() {
-  const [data, setData] = useState<PengajuanTA[]>([]);
+export function useCurrentThesis() {
+  const [thesis, setThesis] = useState<StudentThesis | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -12,11 +13,10 @@ export function useRiwayatTA() {
     setIsLoading(true);
     setError(null);
     try {
-      const result = await taService.getAll();
-      setData(result);
+      const result = await studentThesisApi.getCurrentThesis();
+      setThesis(result);
     } catch (err: any) {
-      console.error('[useRiwayatTA] Error:', err);
-      setError(err?.userMessage ?? err?.message ?? 'Gagal memuat data riwayat pengajuan.');
+      setError(err?.userMessage ?? err?.message ?? 'Gagal memuat data TA.');
     } finally {
       setIsLoading(false);
     }
@@ -26,5 +26,7 @@ export function useRiwayatTA() {
     fetchData();
   }, [fetchData]);
 
-  return { data, isLoading, error, refetch: fetchData };
+  return { thesis, isLoading, error, refetch: fetchData };
 }
+
+export const useRiwayatTA = useCurrentThesis;
