@@ -8,7 +8,7 @@ export default function BimbinganShell({
   title,
   description,
   breadcrumbItems,
-  actions,
+  actions = null,
   children,
 }) {
   return (

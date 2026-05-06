@@ -20,8 +20,12 @@ export default function DataTable({
   onActivate,
   customRender = {},
   headerClassName = "text-white",
+  headerBackgroundColor = "#DABC4E",
   nomertext = "No",
   isLoading = false,
+  flatTopCorners = false,
+  noRounded = false,
+  noShadow = false,
 }) {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
@@ -112,11 +116,20 @@ export default function DataTable({
     );
   };
 
+  const tableContainerClassName = `bg-white overflow-hidden ${noShadow ? '' : 'shadow-xl'}`.trim();
+  const tableBorderRadius = noRounded ? '0' : flatTopCorners ? '0 0 12px 12px' : '12px';
+
   return (
-    <div className="bg-white shadow-xl overflow-hidden" style={{ borderRadius: '12px', fontFamily: 'Urbanist, sans-serif' }}>
+    <div
+      className={tableContainerClassName}
+      style={{
+        borderRadius: tableBorderRadius,
+        fontFamily: 'Urbanist, sans-serif',
+      }}
+    >
       <div className="overflow-x-auto">
         <table className="w-full">
-          <thead className={headerClassName} style={{ backgroundColor: '#DABC4E' }}>
+          <thead className={headerClassName} style={{ backgroundColor: headerBackgroundColor }}>
             <tr className="hover:bg-transparent">
               {/* Number column */}
               <th className="text-center font-semibold w-16 p-4" style={{

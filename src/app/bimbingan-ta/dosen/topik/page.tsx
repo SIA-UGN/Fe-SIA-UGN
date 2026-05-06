@@ -17,13 +17,23 @@ import { formatDate } from '@/features/bimbingan-ta/utils';
 import type { ThesisTopic, ThesisTopicStatus } from '@/features/bimbingan-ta/types';
 
 export default function DosenTopicsPage() {
-  const [topics, setTopics] = useState<ThesisTopic[]>([]);
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | ThesisTopicStatus>('all');
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<ThesisTopic | null>(null);
+  const { user } = useAuth();
+
+  const [loading, setLoading] = useState(true);
+  const [topics, setTopics] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [programId, setProgramId] = useState(null);
+
+  const [searchInput, setSearchInput] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const [actionLoadingId, setActionLoadingId] = useState(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState('add');
+  const [editingTopic, setEditingTopic] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [form, setForm] = useState(DEFAULT_FORM);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -46,39 +56,144 @@ export default function DosenTopicsPage() {
     if (!success) return;
     const timer = setTimeout(() => setSuccess(null), 4000);
     return () => clearTimeout(timer);
-  }, [success]);
+  }, [searchInput]);
+
+  const categoryMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    categories.forEach((category) => {
+      map[category.id_thesis_category] = category.name;
+    });
+    return map;
+  }, [categories]);
 
   const filteredTopics = useMemo(() => {
     return topics.filter((topic) => {
-      const matchesStatus = statusFilter === 'all' || topic.status === statusFilter;
-      const q = search.trim().toLowerCase();
-      const matchesSearch =
-        !q ||
-        [topic.topic, topic.title_ind, topic.title_eng, topic.program?.name]
-          .filter(Boolean)
-          .some((value) => String(value).toLowerCase().includes(q));
+      const categoryName =
+        topic?.thesis_category?.name ||
+        topic?.category?.name ||
+        categoryMap[topic?.id_thesis_category] ||
+        '';
 
-      return matchesStatus && matchesSearch;
+      return [
+        topic?.title_ind,
+        topic?.description,
+        topic?.topic,
+        topic?.lecturer?.name,
+        categoryName,
+      ]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(searchQuery));
     });
-  }, [search, statusFilter, topics]);
+  }, [categoryMap, searchQuery, topics]);
 
-  const handlePublish = async (id: number) => {
-    try {
-      await lecturerThesisApi.publishTopic(id);
-      setSuccess('Topik TA berhasil dipublikasikan.');
-      await fetchData();
-    } catch (err: any) {
-      setError(err?.userMessage || err?.message || 'Gagal mempublikasikan topik.');
-    }
+  const resetModalState = () => {
+    setModalOpen(false);
+    setModalMode('add');
+    setEditingTopic(null);
+    setSubmitting(false);
+    setForm(DEFAULT_FORM);
+    setFormErrors({});
   };
 
-  const handleArchive = async (id: number) => {
+  const openAddModal = () => {
+    setModalMode('add');
+    setEditingTopic(null);
+    setForm(DEFAULT_FORM);
+    setFormErrors({});
+    setModalOpen(true);
+  };
+
+  const openEditModal = (topic) => {
+    setModalMode('edit');
+    setEditingTopic(topic);
+    setForm({
+      title_ind: topic?.title_ind || '',
+      id_thesis_category: String(
+        topic?.id_thesis_category ||
+          topic?.thesis_category?.id_thesis_category ||
+          topic?.category?.id_thesis_category ||
+          '',
+      ),
+      description: topic?.description || '',
+      quota: String(topic?.quota || 1),
+      status: normalizeTopicStatus(topic?.status),
+    });
+    setFormErrors({});
+    setModalOpen(true);
+  };
+
+  const onChangeForm = (key, value) => {
+    setForm((prev) => ({ ...prev, [key]: value }));
+    setFormErrors((prev) => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  };
+
+  const validateForm = () => {
+    const nextErrors: Record<string, string> = {};
+
+    if (!form.title_ind.trim()) nextErrors.title_ind = 'Judul wajib diisi';
+    if (!form.id_thesis_category) nextErrors.id_thesis_category = 'Kategori wajib dipilih';
+    if (!form.description.trim()) nextErrors.description = 'Deskripsi wajib diisi';
+    if (!Number(form.quota) || Number(form.quota) < 1) nextErrors.quota = 'Kuota minimal 1';
+
+    setFormErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
+  };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    if (!validateForm()) return;
+
+    const effectiveProgramId = Number(programId || user?.id_program || 0);
+    if (!effectiveProgramId) {
+      toast.error('Program studi tidak ditemukan. Muat ulang halaman lalu coba lagi.');
+      return;
+    }
+
+    const payload = {
+      topic: deriveTopicKeyword(form.title_ind),
+      title_ind: form.title_ind.trim(),
+      title_eng: '',
+      description: form.description.trim(),
+      quota: Number(form.quota),
+      id_program: effectiveProgramId,
+      id_thesis_category: form.id_thesis_category ? Number(form.id_thesis_category) : null,
+    };
+
+    setSubmitting(true);
+
     try {
-      await lecturerThesisApi.archiveTopic(id);
-      setSuccess('Topik TA berhasil diarsipkan.');
-      await fetchData();
-    } catch (err: any) {
-      setError(err?.userMessage || err?.message || 'Gagal mengarsipkan topik.');
+      let savedTopic = null;
+
+      if (modalMode === 'add') {
+        const response = await api.post('/lecturer/thesis/topics', payload);
+        savedTopic = response?.data?.data || null;
+      } else {
+        const response = await api.put(
+          `/lecturer/thesis/topics/${editingTopic?.id_thesis_topic}`,
+          payload,
+        );
+        savedTopic = response?.data?.data || null;
+      }
+
+      const desiredStatus = normalizeTopicStatus(form.status);
+      const savedStatus = normalizeTopicStatus(savedTopic?.status || editingTopic?.status);
+      const targetId = savedTopic?.id_thesis_topic || editingTopic?.id_thesis_topic;
+
+      if (desiredStatus === 'available' && savedStatus === 'draft' && targetId) {
+        await api.patch(`/lecturer/thesis/topics/${targetId}/publish`);
+      }
+
+      toast.success(modalMode === 'add' ? 'Judul TA berhasil ditambahkan' : 'Judul TA berhasil diperbarui');
+      resetModalState();
+      fetchData();
+    } catch (err) {
+      toast.error(getErrorMessage(err, 'Gagal menyimpan judul TA'));
+    } finally {
+      setSubmitting(false);
     }
   };
 

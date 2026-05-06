@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Calendar, Search, X, ArrowLeft } from 'lucide-react';
 import DataTable from '@/components/ui/table';
 import AdminNavbar from '@/components/ui/admin-navbar';
-import { getAllClasses, toggleClassStatus } from '@/lib/ClassApi';
+import { getClasses, toggleClassStatus } from '@/lib/adminApi';
 import { ErrorMessageBoxWithButton } from '@/components/ui/message-box';
 import { AlertConfirmationDialog, AlertSuccessDialog, AlertErrorDialog } from '@/components/ui/alert-dialog';
 
@@ -30,7 +30,7 @@ export default function KelasDashboard() {
     setLoading(true);
     try {
       setError(null);
-      const response = await getAllClasses();
+      const response = await getClasses();
       if (response.status === 'success') {
         setSuccess(true);
         setKelas(response.data);
@@ -132,6 +132,10 @@ export default function KelasDashboard() {
   // Handle detail action - redirect to detail page
   const handleDetail = (kelasItem, index) => {
     router.push(`/adminpage/tambahkelas/detail?id=${kelasItem.id_class}`);
+  };
+
+  const handleEdit = (kelasItem) => {
+    router.push(`/adminpage/tambahkelas/editform?id=${kelasItem.id_class}`);
   };
 
   // Handle toggle status active/inactive
@@ -265,9 +269,10 @@ export default function KelasDashboard() {
           <DataTable
             columns={columns}
             data={filteredKelas}
-            actions={['detail', 'activate']}
+            actions={['detail', 'edit', 'activate']}
             pagination={true}
             onDetail={handleDetail}
+            onEdit={handleEdit}
             onActivate={handleActivate}
             customRender={customRender}
             isActionLoading={isTogglingStatus}

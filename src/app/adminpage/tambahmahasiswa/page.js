@@ -96,6 +96,10 @@ const handleAddStudent = () => {
 router.push('/adminpage/tambahmahasiswa/addform');
 };
 
+const handleEditStudent = (student) => {
+  router.push(`/adminpage/tambahmahasiswa/editform?id=${student.id_user_si || student.id}`);
+};
+
 // Handle search input change
 const handleSearchChange = (e) => {
   setSearchQuery(e.target.value);
@@ -241,8 +245,9 @@ return (
       <DataTable
           columns={columns}
           data={filteredStudents}
-          actions={['activate']}
+          actions={['edit', 'activate']}
           pagination={true}
+          onEdit={handleEditStudent}
           onActivate={handleActivate}
           customRender={customRender}
       />

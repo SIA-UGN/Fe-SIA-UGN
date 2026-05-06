@@ -95,9 +95,14 @@ const handleSubmit = async (e) => {
     }
   } catch (error) {
     // Tangani error (bisa berupa JSON dari server atau AxiosError)
-    const msg = error?.message || error?.error || error?.response?.data?.message || 'Mohon maaf, terjadi kesalahan saat login.';
+    const msg =
+      error?.message ||
+      error?.error ||
+      error?.response?.data?.message ||
+      error?.userMessage ||
+      'Mohon maaf, terjadi kesalahan saat login.';
     setError(msg);
-    console.error('error di login:', error);
+    console.error('[Login] error:', msg, '| raw:', JSON.stringify(error));
   } finally {
     // Hentikan loading
     setIsSubmitting(false);

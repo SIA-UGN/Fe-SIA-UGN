@@ -9,7 +9,11 @@ import Footer from '@/components/ui/footer'
 import { useDashboardStats } from '@/features/admin-dashboard/hooks/useDashboardStats'
 import Cookies from 'js-cookie'
 import { ErrorMessageBoxWithButton } from '@/components/ui/message-box'
+<<<<<<< HEAD
 import { GraduationCap, Megaphone, Mail, SquareLibrary, Clock, ClipboardCheck, CreditCard } from 'lucide-react'
+=======
+import { GraduationCap, Megaphone, Mail, SquareLibrary, Clock, ClipboardCheck } from 'lucide-react'
+>>>>>>> origin/main-rio
 
 // Icons - using icons from /public/icon folder
 const PlusIcon = () => (
@@ -152,6 +156,12 @@ export default function AdminDashboard() {
       case 'approval-krs':
         router.push('/adminpage/approvalKRS');
         break;
+      case 'manage-krs-time':
+        router.push('/adminpage/kelolawaktukrs');
+        break;
+      case 'approval-krs':
+        router.push('/adminpage/approvalKRS');
+        break;
       default:
         console.log('Unknown action type');
     }
@@ -237,6 +247,7 @@ export default function AdminDashboard() {
       action: () => handleCardClick('manage-library')
     },
     {
+<<<<<<< HEAD
       id: 'manage-UKT',
       title: 'Manajemen UKT',
       description: 'Kelola pembayaran UKT mahasiswa',
@@ -244,6 +255,8 @@ export default function AdminDashboard() {
       action: () => handleCardClick('manage-UKT')
     },
     {
+=======
+>>>>>>> origin/main-rio
       id: 'manage-krs-time',
       title: 'Kelola Waktu KRS',
       description: 'Atur jadwal pembukaan dan penutupan pengisian KRS untuk setiap semester',

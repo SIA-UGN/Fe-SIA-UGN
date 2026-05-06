@@ -6,7 +6,6 @@ import Link from 'next/link';
 import { ArrowLeft, Mail, BookOpen, Clock, CheckCircle2, XCircle } from 'lucide-react';
 import AdminNavbar from '@/components/ui/admin-navbar';
 import Footer from '@/components/ui/footer';
-import { PrimaryButton } from '@/components/ui/button';
 import { ErrorMessageBoxWithButton } from '@/components/ui/message-box';
 import { SuccessMessageBox } from '@/components/ui/message-box';
 

@@ -22,7 +22,7 @@ export default function Footer() {
                                 alt="UGN Logo"
                                 width={50}
                                 height={50}
-                                className="object-cover"
+                                className="w-[50px] h-auto object-contain"
                                 sizes="56px"
                             />
                         </div>

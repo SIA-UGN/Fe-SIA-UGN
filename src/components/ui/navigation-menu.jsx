@@ -62,7 +62,13 @@ const NavbarMenu = forwardRef(({ className, isMobileMenuOpen, setIsMobileMenuOpe
       <NavbarMenuItem href="/akademik">Akademik</NavbarMenuItem>
       <NavbarMenuItem href="/kehadiran">Kehadiran</NavbarMenuItem>
       <NavbarMenuItem href="/hasil-studi">Hasil Studi</NavbarMenuItem>
+<<<<<<< HEAD
       {role === 'mahasiswa' ? <NavbarMenuItem href="/ukt">Pembayaran UKT</NavbarMenuItem> : null}
+=======
+      {role === 'mahasiswa' && (
+        <NavbarMenuItem href="/krsmahasiswa">Pengisian KRS</NavbarMenuItem>
+      )}
+>>>>>>> origin/main-rio
       {role === 'mahasiswa' || role === 'dosen' ? (
         role === 'mahasiswa' ? <BimbinganDropdownMahasiswa /> : <BimbinganDropdownDosen />
       ) : (
@@ -119,6 +125,14 @@ const NavbarMenu = forwardRef(({ className, isMobileMenuOpen, setIsMobileMenuOpe
         >
           Hasil Studi
         </MobileNavMenuItem>
+        {role === 'mahasiswa' && (
+          <MobileNavMenuItem
+            href="/krsmahasiswa"
+            onClick={() => setIsMobileMenuOpen(false)}
+          >
+            Pengisian KRS
+          </MobileNavMenuItem>
+        )}
         {role === 'mahasiswa' ? (
           <MobileNavMenuItem
             href="/ukt"
