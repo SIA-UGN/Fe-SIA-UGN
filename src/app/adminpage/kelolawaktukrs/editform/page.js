@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, Save, X, Info } from 'lucide-react';
 import AdminNavbar from '@/components/ui/admin-navbar';
 import Footer from '@/components/ui/footer';
+import LoadingEffect from '@/components/ui/loading-effect';
 import {
   Field,
   FieldLabel,
@@ -37,7 +38,7 @@ const STATUS_OPTIONS = [
   { value: 'selesai',  label: 'Selesai' },
 ];
 
-export default function EditSesiKRS() {
+function EditSesiKRSForm() {
   const router       = useRouter();
   const searchParams = useSearchParams();
   const id           = searchParams.get('id');
@@ -454,5 +455,13 @@ export default function EditSesiKRS() {
         }}
       />
     </div>
+  );
+}
+
+export default function Page() {
+  return (
+    <Suspense fallback={<LoadingEffect message="Memuat data sesi KRS..." />}>
+      <EditSesiKRSForm />
+    </Suspense>
   );
 }
