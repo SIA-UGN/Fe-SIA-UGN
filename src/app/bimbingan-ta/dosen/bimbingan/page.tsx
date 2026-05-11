@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { ErrorMessageBoxWithButton } from '@/components/ui/message-box';
 import { StudentThesisShell } from '@/features/bimbingan-ta/components/ThesisShell';
@@ -10,14 +11,44 @@ import ThesisSectionCard from '@/features/bimbingan-ta/components/ThesisSectionC
 import ThesisStatusBadge from '@/features/bimbingan-ta/components/ThesisStatusBadge';
 import { lecturerThesisApi } from '@/features/bimbingan-ta/api/lecturer';
 import { formatDate } from '@/features/bimbingan-ta/utils';
+import { getErrorMessage } from '@/features/library/utils';
+import api from '@/lib/axios';
 import type { ThesisSupervisor } from '@/features/bimbingan-ta/types';
-import TambahProgramStudiModal from '@/components/bimbingan/TambahProgramStudiModal';
-import TambahKategoriTAModal from '@/components/bimbingan/TambahKategoriTAModal';
+
+const DEFAULT_NOTE_FORM = {
+  subject: '',
+  lecturer_notes: '',
+  next_task: '',
+};
+
+const DEFAULT_SCHEDULE_FORM = {
+  consultation_date: '',
+  subject: '',
+  location: '',
+  start_time: '',
+  end_time: '',
+};
+
+function toIsoDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function getLatestProgress(supervisee: any): number {
+  if (!supervisee?.consultations || supervisee.consultations.length === 0) {
+    return 0;
+  }
+  const latest = supervisee.consultations[supervisee.consultations.length - 1];
+  return latest?.progress || 0;
+}
 
 export default function DosenSuperviseesPage() {
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [search, setSearch] = useState('');
   const [supervisees, setSupervisees] = useState([]);
-  const [searchInput, setSearchInput] = useState('');
   const [selectedSupervisorId, setSelectedSupervisorId] = useState(null);
 
   const [noteModalOpen, setNoteModalOpen] = useState(false);
@@ -56,7 +87,7 @@ export default function DosenSuperviseesPage() {
         String(value).toLowerCase().includes(query),
       );
     });
-  }, [searchInput, supervisees]);
+  }, [search, supervisees]);
 
   const selectedSupervisee = useMemo(() => {
     return (
@@ -125,7 +156,7 @@ export default function DosenSuperviseesPage() {
       });
       toast.success('Catatan berhasil ditambahkan');
       closeNoteModal();
-      fetchSupervisees();
+      fetchData();
     } catch (err) {
       toast.error(getErrorMessage(err, 'Gagal menambahkan catatan'));
     } finally {
@@ -160,7 +191,7 @@ export default function DosenSuperviseesPage() {
       });
       toast.success('Jadwal berhasil ditambahkan');
       closeScheduleModal();
-      fetchSupervisees();
+      fetchData();
     } catch (err) {
       toast.error(getErrorMessage(err, 'Gagal menambahkan jadwal'));
     } finally {

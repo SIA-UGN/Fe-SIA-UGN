@@ -1,8 +1,13 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { correspondenceService } from '@/types/correspondence';
+import {
+    useCorrespondenceCategoriesQuery,
+    useCorrespondenceDetailQuery,
+    useCorrespondenceRecipientsQuery,
+    useUpdateCorrespondenceMutation,
+} from '@/features/persuratan/hooks/useCorrespondenceQueries';
 
 /**
  * Custom hook for the "Edit Surat" page.
@@ -12,68 +17,31 @@ import { correspondenceService } from '@/types/correspondence';
 export function useEditSurat(correspondenceId) {
     const router = useRouter();
 
-    // Data states
-    const [initialData, setInitialData] = useState(null);
-    const [categories, setCategories] = useState([]);
-    const [recipients, setRecipients] = useState([]);
+    const detailQuery = useCorrespondenceDetailQuery(correspondenceId, { enabled: Boolean(correspondenceId) });
+    const categoriesQuery = useCorrespondenceCategoriesQuery();
+    const recipientsQuery = useCorrespondenceRecipientsQuery();
+    const updateMutation = useUpdateCorrespondenceMutation();
 
-    // Loading / error states
-    const [isLoading, setIsLoading] = useState(true);
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const [error, setError] = useState(null);
     const [submitError, setSubmitError] = useState(null);
 
-    // Fetch detail + categories + recipients on mount
-    useEffect(() => {
-        let cancelled = false;
-
-        const fetchData = async () => {
-            setIsLoading(true);
-            setError(null);
-            try {
-                const [detail, cats, recs] = await Promise.all([
-                    correspondenceService.getDetail(Number(correspondenceId)),
-                    correspondenceService.getCategories(),
-                    correspondenceService.getRecipients(),
-                ]);
-
-                if (cancelled) return;
-
-                // Business logic: only "submitted" letters can be edited
-                if (detail.status !== 'submitted') {
-                    alert('Surat yang sudah diproses tidak dapat diubah.');
-                    router.replace('/persuratan/status');
-                    return;
-                }
-
-                // Map detail to initialData, including attachment_url
-                setInitialData({
-                    ...detail,
-                    id_category: detail.id_category || detail.category?.id_category,
-                    id_recipient: detail.id_recipient || detail.recipient?.id_recipient,
-                    attachment_url: detail.attachment_url || null,
-                });
-                setCategories(cats || []);
-                setRecipients(recs || []);
-            } catch (err) {
-                if (!cancelled) {
-                    console.error('[useEditSurat] Error fetching data:', err);
-                    setError(
-                        err?.response?.data?.message ||
-                        err?.message ||
-                        'Gagal memuat data surat.'
-                    );
-                }
-            } finally {
-                if (!cancelled) setIsLoading(false);
-            }
+    const initialData = useMemo(() => {
+        if (!detailQuery.data) return null;
+        return {
+            ...detailQuery.data,
+            id_category: detailQuery.data.id_category || detailQuery.data.category?.id_category,
+            id_recipient: detailQuery.data.id_recipient || detailQuery.data.recipient?.id_recipient,
+            attachment_url: detailQuery.data.attachment_url || null,
         };
+    }, [detailQuery.data]);
 
-        if (correspondenceId) {
-            fetchData();
+    useEffect(() => {
+        if (!detailQuery.data) return;
+
+        if (detailQuery.data.status !== 'submitted') {
+            alert('Surat yang sudah diproses tidak dapat diubah.');
+            router.replace('/persuratan/status');
         }
-        return () => { cancelled = true; };
-    }, [correspondenceId, router]);
+    }, [detailQuery.data, router]);
 
     /**
      * Submit the edited form.
@@ -81,7 +49,6 @@ export function useEditSurat(correspondenceId) {
      * the backend will keep the existing one.
      */
     const onSubmit = useCallback(async (data) => {
-        setIsSubmitting(true);
         setSubmitError(null);
         try {
             const payload = {
@@ -96,7 +63,7 @@ export function useEditSurat(correspondenceId) {
                 payload.attachment = data.attachment;
             }
 
-            await correspondenceService.update(Number(correspondenceId), payload);
+            await updateMutation.mutateAsync({ id: Number(correspondenceId), payload });
 
             // Navigate to status page on success
             router.push('/persuratan/status');
@@ -104,8 +71,10 @@ export function useEditSurat(correspondenceId) {
             console.error('[useEditSurat] Submit error:', err);
 
             // Detailed 422 validation error logging
-            if (err?.response?.status === 422) {
-                const validationErrors = err.response.data?.errors;
+            const statusCode = err?.status || err?.response?.status;
+            const validationErrors = err?.validationErrors || err?.response?.data?.errors;
+
+            if (statusCode === 422) {
                 console.error('[useEditSurat] 422 Validation Errors:', validationErrors);
 
                 if (validationErrors) {
@@ -121,17 +90,22 @@ export function useEditSurat(correspondenceId) {
                 err?.message ||
                 'Gagal menyimpan perubahan. Silakan coba lagi.'
             );
-        } finally {
-            setIsSubmitting(false);
         }
-    }, [correspondenceId, router]);
+    }, [correspondenceId, updateMutation, router]);
+
+    const error =
+        detailQuery.error?.message ||
+        detailQuery.error?.userMessage ||
+        categoriesQuery.error?.message ||
+        recipientsQuery.error?.message ||
+        null;
 
     return {
         initialData,
-        categories,
-        recipients,
-        isLoading,
-        isSubmitting,
+        categories: categoriesQuery.data || [],
+        recipients: recipientsQuery.data || [],
+        isLoading: detailQuery.isLoading || categoriesQuery.isLoading || recipientsQuery.isLoading,
+        isSubmitting: updateMutation.isPending,
         error,
         submitError,
         onSubmit,

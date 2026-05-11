@@ -1,8 +1,12 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { correspondenceService } from '@/types/correspondence';
+import {
+    useCorrespondenceCategoriesQuery,
+    useCorrespondenceRecipientsQuery,
+    useCreateCorrespondenceMutation,
+} from '@/features/persuratan/hooks/useCorrespondenceQueries';
 
 /**
  * Custom hook for the "Ajukan Surat" form.
@@ -12,49 +16,17 @@ import { correspondenceService } from '@/types/correspondence';
 export function useAjukanSurat() {
     const router = useRouter();
 
-    // Master data
-    const [categories, setCategories] = useState([]);
-    const [recipients, setRecipients] = useState([]);
+    const categoriesQuery = useCorrespondenceCategoriesQuery();
+    const recipientsQuery = useCorrespondenceRecipientsQuery();
+    const createMutation = useCreateCorrespondenceMutation();
 
-    // Loading / error states
-    const [isLoading, setIsLoading] = useState(true);
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const [error, setError] = useState(null);
     const [submitError, setSubmitError] = useState(null);
 
-    // Fetch categories and recipients on mount
-    useEffect(() => {
-        let cancelled = false;
-
-        const fetchMasterData = async () => {
-            setIsLoading(true);
-            setError(null);
-            try {
-                const [cats, recs] = await Promise.all([
-                    correspondenceService.getCategories(),
-                    correspondenceService.getRecipients(),
-                ]);
-                if (!cancelled) {
-                    setCategories(cats || []);
-                    setRecipients(recs || []);
-                }
-            } catch (err) {
-                if (!cancelled) {
-                    console.error('[useAjukanSurat] Error fetching master data:', err);
-                    setError(
-                        err?.response?.data?.message ||
-                        err?.message ||
-                        'Gagal memuat data kategori dan tujuan.'
-                    );
-                }
-            } finally {
-                if (!cancelled) setIsLoading(false);
-            }
-        };
-
-        fetchMasterData();
-        return () => { cancelled = true; };
-    }, []);
+    const error = useMemo(() => {
+        const categoryError = categoriesQuery.error?.message || categoriesQuery.error?.userMessage;
+        const recipientError = recipientsQuery.error?.message || recipientsQuery.error?.userMessage;
+        return categoryError || recipientError || null;
+    }, [categoriesQuery.error, recipientsQuery.error]);
 
     /**
      * Submit the form.
@@ -66,10 +38,9 @@ export function useAjukanSurat() {
      * @param {File}   [data.attachment]
      */
     const onSubmit = useCallback(async (data) => {
-        setIsSubmitting(true);
         setSubmitError(null);
         try {
-            await correspondenceService.create({
+            await createMutation.mutateAsync({
                 title: data.title,
                 id_category: Number(data.category_id),
                 id_recipient: Number(data.recipient_id),
@@ -83,11 +54,12 @@ export function useAjukanSurat() {
             console.error('[useAjukanSurat] Submit error:', err);
 
             // Detailed 422 validation error logging
-            if (err?.response?.status === 422) {
-                const validationErrors = err.response.data?.errors;
+            const statusCode = err?.status || err?.response?.status;
+            const validationErrors = err?.validationErrors || err?.response?.data?.errors;
+
+            if (statusCode === 422) {
                 console.error('[useAjukanSurat] 422 Validation Errors:', validationErrors);
 
-                // Build a user-friendly message from the first validation error
                 if (validationErrors) {
                     const firstField = Object.keys(validationErrors)[0];
                     const firstMessage = validationErrors[firstField]?.[0];
@@ -101,16 +73,14 @@ export function useAjukanSurat() {
                 err?.message ||
                 'Gagal mengirim pengajuan. Silakan coba lagi.'
             );
-        } finally {
-            setIsSubmitting(false);
         }
-    }, [router]);
+    }, [createMutation, router]);
 
     return {
-        categories,
-        recipients,
-        isLoading,
-        isSubmitting,
+        categories: categoriesQuery.data || [],
+        recipients: recipientsQuery.data || [],
+        isLoading: categoriesQuery.isLoading || recipientsQuery.isLoading,
+        isSubmitting: createMutation.isPending,
         error,
         submitError,
         onSubmit,

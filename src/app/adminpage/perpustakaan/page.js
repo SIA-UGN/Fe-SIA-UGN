@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
+  ArrowLeft,
   ArrowRight,
   BookOpen,
   ChevronLeft,
@@ -18,7 +19,8 @@ import {
   Edit,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import AdminBimbinganShell from '@/components/admin/admin-bimbingan-shell';
+import AdminNavbar from '@/components/ui/admin-navbar';
+import Footer from '@/components/ui/footer';
 import AdminBookModal from '@/components/library/admin-book-modal';
 import StatCard from '@/components/ui/info-card';
 import DataTable from '@/components/ui/table';
@@ -294,13 +296,36 @@ export default function AdminLibraryPage() {
   }, [meta.last_page, page]);
 
   return (
-    <AdminBimbinganShell
-      title="Manajemen Perpustakaan"
-      description="Kelola data buku, stok, dan informasi perpustakaan"
-      backHref="/adminpage"
-      backLabel="Kembali ke Dashboard"
-    >
-      {error ? <ErrorMessageBoxWithButton message={error} action={fetchBooks} /> : null}
+    <div className="min-h-screen flex flex-col">
+      <AdminNavbar title="Manajemen Perpustakaan" />
+
+      <main className="flex-1 bg-brand-light-sage">
+        <div className="p-6">
+          <div className="max-w-7xl mx-auto">
+            <Link
+              href="/adminpage"
+              className="inline-flex items-center gap-2 text-sm font-medium mb-6 transition-colors hover:opacity-80"
+              style={{ color: '#015023', fontFamily: 'Urbanist, sans-serif' }}
+            >
+              <ArrowLeft size={18} />
+              Kembali ke Dashboard
+            </Link>
+
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8 gap-4">
+              <div>
+                <h1
+                  className="text-2xl sm:text-3xl font-bold mb-1"
+                  style={{ color: '#015023', fontFamily: 'Urbanist, sans-serif' }}
+                >
+                  Manajemen Perpustakaan
+                </h1>
+                <p className="text-gray-500 text-sm" style={{ fontFamily: 'Urbanist, sans-serif' }}>
+                  Kelola data buku, stok, dan informasi perpustakaan
+                </p>
+              </div>
+            </div>
+
+            {error ? <ErrorMessageBoxWithButton message={error} action={fetchBooks} /> : null}
 
       {/* ── Info Card ── */}
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -434,6 +459,11 @@ export default function AdminLibraryPage() {
         saving={saving}
         onCreateCategory={handleCreateCategory}
       />
-    </AdminBimbinganShell>
+          </div>
+        </div>
+      </main>
+
+      <Footer />
+    </div>
   );
 }

@@ -3,14 +3,14 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
-  mockGetAdminDashboard,
-  mockGetRiwayatPembayaranMahasiswa,
-  mockGetTagihanAdmin,
-  mockGetTagihanAdminDetail,
-  mockGetTagihanDetail,
-  mockGetTagihanMahasiswa,
-  mockGetVirtualAccountMahasiswa,
-} from '@/lib/mock-api/ukt';
+  fetchAdminTuitionBillDetail,
+  fetchAdminTuitionBills,
+  fetchAdminTuitionDashboard,
+  fetchStudentPaymentHistory,
+  fetchStudentTuitionBillDetail,
+  fetchStudentTuitionBills,
+  fetchStudentVirtualAccount,
+} from '@/features/ukt/services/tuitionService';
 
 export const uktQueryKeys = {
   all: ['ukt'],
@@ -58,12 +58,11 @@ export function useTagihanMahasiswa(filters = {}) {
   return useQuery({
     queryKey: uktQueryKeys.mahasiswaTagihan(nim, filters),
     queryFn: () =>
-      mockGetTagihanMahasiswa({
-        nim,
+      fetchStudentTuitionBills({
         status: filters.status,
         academic_period_id: filters.academicPeriodId,
       }),
-    select: (response) => response?.data,
+    select: (response) => response,
   });
 }
 
@@ -72,9 +71,9 @@ export function useTagihanDetailMahasiswa(id) {
 
   return useQuery({
     queryKey: uktQueryKeys.mahasiswaTagihanDetail(nim, id),
-    queryFn: () => mockGetTagihanDetail(id, { nim }),
+    queryFn: () => fetchStudentTuitionBillDetail(id),
     enabled: Boolean(id),
-    select: (response) => response?.data,
+    select: (response) => response?.bill,
   });
 }
 
@@ -83,8 +82,8 @@ export function useRiwayatPembayaranMahasiswa() {
 
   return useQuery({
     queryKey: uktQueryKeys.mahasiswaRiwayat(nim),
-    queryFn: () => mockGetRiwayatPembayaranMahasiswa({ nim }),
-    select: (response) => response?.data || [],
+    queryFn: () => fetchStudentPaymentHistory(),
+    select: (response) => response?.items || [],
   });
 }
 
@@ -93,16 +92,16 @@ export function useVirtualAccountMahasiswa() {
 
   return useQuery({
     queryKey: uktQueryKeys.mahasiswaVirtualAccount(nim),
-    queryFn: () => mockGetVirtualAccountMahasiswa({ nim }),
-    select: (response) => response?.data || [],
+    queryFn: () => fetchStudentVirtualAccount(),
+    select: (response) => response?.account ?? null,
   });
 }
 
 export function useAdminDashboardUKT(academicPeriodId) {
   return useQuery({
     queryKey: uktQueryKeys.adminDashboard(academicPeriodId),
-    queryFn: () => mockGetAdminDashboard({ academic_period_id: academicPeriodId }),
-    select: (response) => response?.data,
+    queryFn: () => fetchAdminTuitionDashboard({ academic_period_id: academicPeriodId }),
+    select: (response) => response?.dashboard,
   });
 }
 
@@ -110,21 +109,21 @@ export function useTagihanAdmin(filters = {}) {
   return useQuery({
     queryKey: uktQueryKeys.adminTagihan(filters),
     queryFn: () =>
-      mockGetTagihanAdmin({
+      fetchAdminTuitionBills({
         academic_period_id: filters.academicPeriodId,
         status: filters.status,
         program_id: filters.programId,
         search: filters.search,
       }),
-    select: (response) => response?.data || [],
+    select: (response) => response?.items || [],
   });
 }
 
 export function useTagihanAdminDetail(id) {
   return useQuery({
     queryKey: uktQueryKeys.adminTagihanDetail(id),
-    queryFn: () => mockGetTagihanAdminDetail(id),
+    queryFn: () => fetchAdminTuitionBillDetail(id),
     enabled: Boolean(id),
-    select: (response) => response?.data,
+    select: (response) => response?.bill,
   });
 }

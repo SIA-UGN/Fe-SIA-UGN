@@ -110,7 +110,7 @@ export default function AdminThesisDashboardPage() {
       ) : error ? (
         <ErrorMessageBoxWithButton message={error} action={fetchData} />
       ) : (
-        <div className="min-h-screen bg-[#f3f6f4] p-6 rounded-2xl">
+        <div className="rounded-2xl">
           {warning ? (
             <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
               {warning}
@@ -177,7 +177,7 @@ export default function AdminThesisDashboardPage() {
             description="Data terbaru diambil langsung dari endpoint backend /admin/thesis/students."
             actions={(
               <Button asChild variant="outline" size="sm">
-                <Link href="/adminpage/thesis/students">Lihat semua</Link>
+                <Link href="/adminpage/thesis/users">Lihat semua</Link>
               </Button>
             )}
           >

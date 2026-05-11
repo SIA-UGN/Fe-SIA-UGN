@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { toast } from 'sonner';
 import { AlertConfirmationRedDialog } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import {
@@ -14,18 +15,46 @@ import ThesisSectionCard from '@/features/bimbingan-ta/components/ThesisSectionC
 import ThesisStatusBadge from '@/features/bimbingan-ta/components/ThesisStatusBadge';
 import { lecturerThesisApi } from '@/features/bimbingan-ta/api/lecturer';
 import { formatDate } from '@/features/bimbingan-ta/utils';
+import { getErrorMessage } from '@/features/library/utils';
+import { useAuth } from '@/lib/auth-context';
+import api from '@/lib/axios';
 import type { ThesisTopic, ThesisTopicStatus } from '@/features/bimbingan-ta/types';
+
+const DEFAULT_FORM = {
+  title_ind: '',
+  id_thesis_category: '',
+  description: '',
+  quota: '1',
+  status: 'draft' as ThesisTopicStatus,
+};
+
+function normalizeTopicStatus(status?: string | null): ThesisTopicStatus {
+  const valid: ThesisTopicStatus[] = ['draft', 'available', 'taken', 'archived'];
+  return (valid.includes(status as ThesisTopicStatus) ? status : 'draft') as ThesisTopicStatus;
+}
+
+function deriveTopicKeyword(title: string): string {
+  return title
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s]/g, '')
+    .replace(/\s+/g, '-')
+    .slice(0, 50);
+}
 
 export default function DosenTopicsPage() {
   const { user } = useAuth();
 
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [topics, setTopics] = useState([]);
   const [categories, setCategories] = useState([]);
   const [programId, setProgramId] = useState(null);
 
-  const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | ThesisTopicStatus>('all');
 
   const [actionLoadingId, setActionLoadingId] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -34,6 +63,7 @@ export default function DosenTopicsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState(DEFAULT_FORM);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [deleteTarget, setDeleteTarget] = useState<ThesisTopic | null>(null);
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -56,7 +86,7 @@ export default function DosenTopicsPage() {
     if (!success) return;
     const timer = setTimeout(() => setSuccess(null), 4000);
     return () => clearTimeout(timer);
-  }, [searchInput]);
+  }, [success]);
 
   const categoryMap = useMemo(() => {
     const map: Record<string, string> = {};
@@ -74,7 +104,7 @@ export default function DosenTopicsPage() {
         categoryMap[topic?.id_thesis_category] ||
         '';
 
-      return [
+      const matchesSearch = [
         topic?.title_ind,
         topic?.description,
         topic?.topic,
@@ -82,9 +112,13 @@ export default function DosenTopicsPage() {
         categoryName,
       ]
         .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(searchQuery));
+        .some((value) => String(value).toLowerCase().includes(search.toLowerCase()));
+
+      const matchesStatus = statusFilter === 'all' || topic?.status === statusFilter;
+
+      return matchesSearch && matchesStatus;
     });
-  }, [categoryMap, searchQuery, topics]);
+  }, [categoryMap, search, statusFilter, topics]);
 
   const resetModalState = () => {
     setModalOpen(false);
@@ -206,6 +240,26 @@ export default function DosenTopicsPage() {
       await fetchData();
     } catch (err: any) {
       setError(err?.userMessage || err?.message || 'Gagal menghapus topik.');
+    }
+  };
+
+  const handlePublish = async (topicId: number) => {
+    try {
+      await api.patch(`/lecturer/thesis/topics/${topicId}/publish`);
+      toast.success('Topik berhasil dipublikasikan');
+      await fetchData();
+    } catch (err) {
+      toast.error(getErrorMessage(err, 'Gagal mempublikasikan topik'));
+    }
+  };
+
+  const handleArchive = async (topicId: number) => {
+    try {
+      await api.patch(`/lecturer/thesis/topics/${topicId}/archive`);
+      toast.success('Topik berhasil diarsipkan');
+      await fetchData();
+    } catch (err) {
+      toast.error(getErrorMessage(err, 'Gagal mengarsipkan topik'));
     }
   };
 

@@ -53,12 +53,12 @@ export default function AdminFilterBar({
             className="bg-white px-4 md:px-5 py-4 shadow-lg"
             style={{ borderRadius: '14px', ...font }}
         >
-            <div className="flex flex-col items-center gap-4">
+            <div className="flex flex-wrap items-center gap-4">
                 {/* Filter icon + label */}
-                <div className="flex items-center justify-center gap-2 pb-1 shrink-0 w-full">
+                <div className="flex items-center justify-center gap-2 shrink-0">
                     <SlidersHorizontal size={18} style={{ color: '#015023' }} />
                     <span
-                        className="text-sm font-bold"
+                        className="text-sm font-bold whitespace-nowrap"
                         style={{ color: '#015023' }}
                     >
                         Filter
@@ -66,12 +66,12 @@ export default function AdminFilterBar({
                 </div>
 
                 {/* Kategori */}
-                <div className="flex flex-col gap-1 w-full max-w-md">
-                    <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide text-center" style={font}>
+                <div className="flex flex-col gap-1 shrink-0">
+                    <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide" style={font}>
                         Kategori
                     </label>
                     <select
-                        style={{ ...selectStyle, width: '100%' }}
+                        style={{ ...selectStyle, minWidth: '150px' }}
                         value={filterCategory}
                         onChange={(e) => setFilterCategory(e.target.value)}
                     >
@@ -85,12 +85,12 @@ export default function AdminFilterBar({
                 </div>
 
                 {/* Status */}
-                <div className="flex flex-col gap-1 w-full max-w-md">
-                    <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide text-center" style={font}>
+                <div className="flex flex-col gap-1 shrink-0">
+                    <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide" style={font}>
                         Status
                     </label>
                     <select
-                        style={{ ...selectStyle, width: '100%' }}
+                        style={{ ...selectStyle, minWidth: '150px' }}
                         value={filterStatus}
                         onChange={(e) => setFilterStatus(e.target.value)}
                     >
@@ -103,26 +103,26 @@ export default function AdminFilterBar({
                 </div>
 
                 {/* Dari Tanggal */}
-                <div className="flex flex-col gap-1 w-full max-w-md">
-                    <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide text-center" style={font}>
+                <div className="flex flex-col gap-1 shrink-0">
+                    <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide" style={font}>
                         Dari Tanggal
                     </label>
                     <input
                         type="date"
-                        style={{ ...inputStyle, width: '100%' }}
+                        style={{ ...inputStyle, minWidth: '150px' }}
                         value={filterDateFrom}
                         onChange={(e) => setFilterDateFrom(e.target.value)}
                     />
                 </div>
 
                 {/* Sampai Tanggal */}
-                <div className="flex flex-col gap-1 w-full max-w-md">
-                    <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide text-center" style={font}>
+                <div className="flex flex-col gap-1 shrink-0">
+                    <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide" style={font}>
                         Sampai Tanggal
                     </label>
                     <input
                         type="date"
-                        style={{ ...inputStyle, width: '100%' }}
+                        style={{ ...inputStyle, minWidth: '150px' }}
                         value={filterDateTo}
                         onChange={(e) => setFilterDateTo(e.target.value)}
                     />
@@ -132,8 +132,8 @@ export default function AdminFilterBar({
                 {hasActiveFilters && (
                     <button
                         onClick={clearFilters}
-                        className="flex items-center justify-center gap-1 px-3 py-2 text-xs font-semibold text-gray-500 transition-colors hover:bg-gray-100 mb-0 w-full max-w-md"
-                        style={{ borderRadius: '8px', border: '1px solid #d1d5db', ...font }}
+                        className="flex items-center justify-center gap-1 px-3 py-2 text-xs font-semibold text-gray-500 transition-colors hover:bg-gray-100 shrink-0"
+                        style={{ borderRadius: '8px', border: '1px solid #d1d5db', height: 'fit-content', ...font }}
                     >
                         <X size={12} />
                         Reset

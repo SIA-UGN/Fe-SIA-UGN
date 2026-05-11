@@ -118,7 +118,7 @@ export default function AdminPersuratanPage() {
                         </div>
 
                         {/* Filter Bar */}
-                        <div className="mb-6">
+                        <div className="mb-6 grid-cols-1 md:grid-cols-2 gap-4">
                             <AdminFilterBar
                                 categories={categories}
                                 filterCategory={filterCategory}

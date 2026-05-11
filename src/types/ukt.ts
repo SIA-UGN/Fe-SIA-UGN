@@ -5,8 +5,7 @@ export const PaymentMethodSchema = z.enum(['virtual_account', 'bank_transfer', '
 export const VerificationStatusSchema = z.enum(['pending', 'verified', 'rejected']);
 
 export const VirtualAccountSchema = z.object({
-  bank: z.string().min(1),
-  nomor: z.string().min(6),
+  va_number: z.string().min(1),
   bank_code: z.string().min(1).optional(),
   bank_name: z.string().min(1).optional(),
   is_active: z.boolean().optional(),
@@ -19,6 +18,7 @@ export const TuitionPaymentSchema = z.object({
   amount_paid: z.number().nonnegative(),
   payment_method: PaymentMethodSchema,
   payment_proof: z.string().nullable().optional(),
+  payment_proof_url: z.string().nullable().optional(),
   transaction_reference: z.string().nullable().optional(),
   verification_status: VerificationStatusSchema,
   verified_by: z.string().nullable().optional(),

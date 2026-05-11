@@ -18,7 +18,9 @@ export interface Recipient {
 
 export interface Correspondence {
     id: number;
-    user_id: number;
+    id_correspondence: number;
+    id_user: number;
+    user_id?: number;
     id_category: number;
     id_recipient: number;
     title: string;
