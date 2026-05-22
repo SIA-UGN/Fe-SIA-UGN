@@ -8,13 +8,14 @@ import ThesisSectionCard from '@/features/bimbingan-ta/components/ThesisSectionC
 import ThesisLoadingBlock from '@/features/bimbingan-ta/components/ThesisLoadingBlock';
 import LecturerTopicForm from '@/features/bimbingan-ta/components/forms/LecturerTopicForm';
 import { lecturerThesisApi } from '@/features/bimbingan-ta/api/lecturer';
-import type { ProgramOption, ThesisTopic } from '@/features/bimbingan-ta/types';
+import type { ProgramOption, ThesisCategory, ThesisTopic } from '@/features/bimbingan-ta/types';
 
 export default function DosenEditTopicPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const [topic, setTopic] = useState<ThesisTopic | null>(null);
   const [programs, setPrograms] = useState<ProgramOption[]>([]);
+  const [categories, setCategories] = useState<ThesisCategory[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -24,12 +25,14 @@ export default function DosenEditTopicPage() {
     setIsLoading(true);
     setError(null);
     try {
-      const [topicData, programData] = await Promise.all([
+      const [topicData, programData, categoryData] = await Promise.all([
         lecturerThesisApi.getTopicDetail(Number(params.id)),
         lecturerThesisApi.resolveProgramOptions(),
+        lecturerThesisApi.getCategories(),
       ]);
       setTopic(topicData);
       setPrograms(programData);
+      setCategories(categoryData);
     } catch (err: any) {
       setError(err?.userMessage || err?.message || 'Gagal memuat data topik.');
     } finally {
@@ -64,6 +67,7 @@ export default function DosenEditTopicPage() {
         <ThesisSectionCard title="Form Edit Topik" description="Pastikan detail topik sudah final sebelum dipublikasikan.">
           <LecturerTopicForm
             programs={programs}
+            categories={categories}
             initialValues={{
               topic: topic.topic || '',
               title_ind: topic.title_ind,
@@ -71,6 +75,11 @@ export default function DosenEditTopicPage() {
               description: topic.description || '',
               quota: topic.quota || 1,
               id_program: topic.id_program || topic.program?.id_program,
+              id_thesis_category:
+                topic.id_thesis_category ||
+                topic.thesis_category?.id_thesis_category ||
+                topic.category?.id_thesis_category ||
+                null,
             }}
             submitError={submitError}
             isSubmitting={isSubmitting}

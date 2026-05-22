@@ -19,7 +19,8 @@ import { AlertConfirmationRedDialog } from '@/components/ui/alert-dialog'
 import ChatModal from '@/components/ui/chatmodal'
 import NavbarNotification from '@/components/ui/navbar-notification'
 import PersuratanDropdown from '@/features/persuratan/components/PersuratanDropdown'
-import BimbinganDropdown from '@/features/bimbingan/components/BimbinganDropdown'
+import BimbinganDropdownDosen from '@/features/bimbingan/components/BimbinganDropdownDosen'
+import BimbinganDropdownMahasiswa from '@/features/bimbingan/components/BimbinganDropdownMahasiswa'
 import LibraryDropdown from '@/features/library/components/LibraryDropdown'
 import { useAuth } from '@/lib/auth-context'
 import { logout } from '@/lib/sessionApi'
@@ -64,8 +65,11 @@ const NavbarMenu = forwardRef(({ className, isMobileMenuOpen, setIsMobileMenuOpe
       {role === 'mahasiswa' && (
         <NavbarMenuItem href="/krsmahasiswa">Pengisian KRS</NavbarMenuItem>
       )}
+      {role === 'mahasiswa' && (
+        <NavbarMenuItem href="/ukt">Pembayaran UKT</NavbarMenuItem>
+      )}
       {role === 'mahasiswa' || role === 'dosen' ? (
-        <BimbinganDropdown role={role} />
+        role === 'mahasiswa' ? <BimbinganDropdownMahasiswa /> : <BimbinganDropdownDosen />
       ) : (
         <NavbarMenuItem href={thesisHref}>Bimbingan TA</NavbarMenuItem>
       )}
@@ -129,48 +133,69 @@ const NavbarMenu = forwardRef(({ className, isMobileMenuOpen, setIsMobileMenuOpe
           </MobileNavMenuItem>
         )}
         {role === 'mahasiswa' ? (
+          <MobileNavMenuItem
+            href="/ukt"
+            onClick={() => setIsMobileMenuOpen(false)}
+          >
+            Pembayaran UKT
+          </MobileNavMenuItem>
+        ) : null}
+        
+        {/* Bimbingan Section */}
+        {(role === 'mahasiswa' || role === 'dosen') && (
           <>
-            <MobileNavMenuItem
-              href="/bimbingan/pengajuan-ta"
-              onClick={() => setIsMobileMenuOpen(false)}
-            >
-              Pengajuan TA
-            </MobileNavMenuItem>
-            <MobileNavMenuItem
-              href="/bimbingan/galeri-judul"
-              onClick={() => setIsMobileMenuOpen(false)}
-            >
-              Galeri Judul TA
-            </MobileNavMenuItem>
-            <MobileNavMenuItem
-              href="/bimbingan/monitoring"
-              onClick={() => setIsMobileMenuOpen(false)}
-            >
-              Monitoring
-            </MobileNavMenuItem>
+            <div className="my-2 px-4 py-2" style={{ backgroundColor: '#015023', borderRadius: '10px' }}>
+              <span className="text-xs font-bold uppercase tracking-wider" style={{ color: '#dabc4e' }}>
+                Bimbingan
+              </span>
+            </div>
+            {role === 'mahasiswa' ? (
+              <>
+                <MobileNavMenuItem
+                  href="/bimbingan-ta/mahasiswa/pengajuan"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  Pengajuan TA
+                </MobileNavMenuItem>
+                <MobileNavMenuItem
+                  href="/bimbingan-ta/mahasiswa/topik"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  Galeri Judul TA
+                </MobileNavMenuItem>
+                <MobileNavMenuItem
+                  href="/bimbingan-ta/mahasiswa/monitoring"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  Monitoring
+                </MobileNavMenuItem>
+              </>
+            ) : role === 'dosen' ? (
+              <>
+                <MobileNavMenuItem
+                  href="/bimbingan-ta/dosen/topik"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  Kelola Judul TA
+                </MobileNavMenuItem>
+                <MobileNavMenuItem
+                  href="/bimbingan-ta/dosen/permintaan"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  Validasi Pengajuan
+                </MobileNavMenuItem>
+                <MobileNavMenuItem
+                  href="/bimbingan-ta/dosen/bimbingan"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  Monitoring Bimbingan
+                </MobileNavMenuItem>
+              </>
+            ) : null}
           </>
-        ) : role === 'dosen' ? (
-          <>
-            <MobileNavMenuItem
-              href="/bimbingan-ta/dosen/topik"
-              onClick={() => setIsMobileMenuOpen(false)}
-            >
-              Kelola Judul TA
-            </MobileNavMenuItem>
-            <MobileNavMenuItem
-              href="/bimbingan-ta/dosen/permintaan"
-              onClick={() => setIsMobileMenuOpen(false)}
-            >
-              Validasi Pengajuan
-            </MobileNavMenuItem>
-            <MobileNavMenuItem
-              href="/bimbingan-ta/dosen/bimbingan"
-              onClick={() => setIsMobileMenuOpen(false)}
-            >
-              Monitoring Bimbingan
-            </MobileNavMenuItem>
-          </>
-        ) : (
+        )}
+        
+        {role !== 'mahasiswa' && role !== 'dosen' && (
           <MobileNavMenuItem
             href={thesisHref}
             onClick={() => setIsMobileMenuOpen(false)}
@@ -216,6 +241,7 @@ const NavbarMenu = forwardRef(({ className, isMobileMenuOpen, setIsMobileMenuOpe
 const MobileNavMenuItem = forwardRef(({ className, href, children, onClick, ...props }, ref) => {
   const pathname = usePathname();
   const isActive = isMenuActive(pathname, href);
+  const isBimbinganItem = href.includes('/bimbingan-ta/');
 
   return (
     <Link
@@ -223,13 +249,17 @@ const MobileNavMenuItem = forwardRef(({ className, href, children, onClick, ...p
       ref={ref}
       onClick={onClick}
       className={cn(
-        "px-4 py-3 rounded-lg font-medium text-base transition-colors duration-200",
-        isActive
-          ? "bg-green-50 text-green-700"
-          : "text-gray-700 hover:bg-gray-50",
+        "px-4 py-3 rounded-lg font-medium text-base transition-all duration-200",
+        isBimbinganItem
+          ? isActive
+            ? "bg-[rgba(218,188,78,0.12)] text-[#dabc4e]"
+            : "text-[#e6eee9] hover:bg-[rgba(218,188,78,0.06)]"
+          : isActive
+            ? "bg-green-50 text-green-700"
+            : "text-gray-700 hover:bg-gray-50",
         className
       )}
-      style={isActive ? { backgroundColor: '#E6F4EA', color: '#015023' } : {}}
+      style={isBimbinganItem ? {} : (isActive ? { backgroundColor: '#E6F4EA', color: '#015023' } : {})}
       {...props}
     >
       {children}
@@ -400,8 +430,13 @@ const Navbar = forwardRef(({ className, ...props }, ref) => {
   const { user } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
-  const role = user.roles || getCurrentRole();
-  const thesisHref = role === 'mahasiswa' ? '/bimbingan/pengajuan-ta' : getThesisHomePath(role);
+  const [cookieRole, setCookieRole] = useState(null);
+  const role = user.roles || cookieRole;
+  const thesisHref = role === 'mahasiswa' ? '/bimbingan-ta/mahasiswa/pengajuan' : getThesisHomePath(role);
+
+  useEffect(() => {
+    setCookieRole(getCurrentRole());
+  }, []);
 
   // Handle scroll event for floating navbar
   useEffect(() => {

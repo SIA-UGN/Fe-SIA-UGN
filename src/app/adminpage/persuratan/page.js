@@ -3,14 +3,14 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Mail, BookOpen, Clock, CheckCircle2, XCircle } from 'lucide-react';
 import AdminNavbar from '@/components/ui/admin-navbar';
 import Footer from '@/components/ui/footer';
 import { ErrorMessageBoxWithButton } from '@/components/ui/message-box';
 import { SuccessMessageBox } from '@/components/ui/message-box';
 
 import { useAdminPersuratan } from '@/features/admin-persuratan/hooks/useAdminPersuratan';
-import AdminStatCard from '@/features/admin-persuratan/components/AdminStatCard';
+import AdminStatCard from '@/components/ui/StatCard';
 import AdminFilterBar from '@/features/admin-persuratan/components/AdminFilterBar';
 import AdminSuratTable from '@/features/admin-persuratan/components/AdminSuratTable';
 import UpdateStatusModal from '@/features/admin-persuratan/components/UpdateStatusModal';
@@ -103,11 +103,22 @@ export default function AdminPersuratanPage() {
 
                         {/* Stats Card */}
                         <div className="mb-6">
-                            <AdminStatCard stats={stats} isLoading={isLoading} />
+                            <AdminStatCard 
+                                title="Total Surat"
+                                total={stats?.total || 0}
+                                subText={"Surat terkirim"}
+                                statuses={[
+                                    { label: 'Dalam Proses', value: stats?.total_in_process || 0, icon: Clock, color: '#4B5563' },
+                                    { label: 'Selesai', value: stats?.total_completed || 0, icon: CheckCircle2, color: '#22C55E' },
+                                    { label: 'Ditolak', value: stats?.total_rejected || 0, icon: XCircle, color: '#EF4444' },
+                                ]}
+                                isLoading={isLoading}
+                                MainIcon={Mail}
+                            />
                         </div>
 
                         {/* Filter Bar */}
-                        <div className="mb-6">
+                        <div className="mb-6 grid-cols-1 md:grid-cols-2 gap-4">
                             <AdminFilterBar
                                 categories={categories}
                                 filterCategory={filterCategory}

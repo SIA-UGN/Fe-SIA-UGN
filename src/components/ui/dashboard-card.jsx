@@ -1,6 +1,8 @@
 import * as React from "react"
 import { cn } from "@/lib/utils"
 
+import { TrendingUp } from "lucide-react"
+
 const DashboardCard = React.forwardRef(({ 
 className, 
 children, 

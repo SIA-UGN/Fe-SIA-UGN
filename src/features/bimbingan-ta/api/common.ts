@@ -73,6 +73,18 @@ export function mapProgramsToOptions(programs?: any[]): ProgramOption[] {
     .filter((program) => Number.isFinite(program.id_program) && program.name);
 }
 
+export function dedupeProgramOptions(programs: ProgramOption[]) {
+  const uniqueMap = new Map<number, ProgramOption>();
+
+  programs.forEach((item) => {
+    if (!Number.isFinite(item?.id_program)) return;
+    if (uniqueMap.has(item.id_program)) return;
+    uniqueMap.set(item.id_program, item);
+  });
+
+  return Array.from(uniqueMap.values());
+}
+
 export function getProgramCandidatesFromPayload(payload: any): ProgramOption[] {
   if (!payload || typeof payload !== 'object') return [];
 
@@ -106,12 +118,31 @@ export function getProgramCandidatesFromPayload(payload: any): ProgramOption[] {
     }
   });
 
-  const uniqueMap = new Map<number, ProgramOption>();
-  derived.forEach((item) => {
-    if (!uniqueMap.has(item.id_program)) {
-      uniqueMap.set(item.id_program, item);
-    }
-  });
+  return dedupeProgramOptions(derived);
+}
 
-  return Array.from(uniqueMap.values());
+export function resolveProgramIdFromPayload(payload: any) {
+  if (!payload || typeof payload !== 'object') return null;
+
+  const directCandidates = [
+    payload?.id_program,
+    payload?.program_id,
+    payload?.staff_data?.id_program,
+    payload?.staff_profile?.id_program,
+    payload?.staff?.id_program,
+    payload?.study_program?.id_program,
+    payload?.program?.id_program,
+  ];
+
+  for (const candidate of directCandidates) {
+    const idProgram = Number(candidate);
+    if (Number.isFinite(idProgram) && idProgram > 0) {
+      return idProgram;
+    }
+  }
+
+  const derived = getProgramCandidatesFromPayload(payload);
+  if (derived.length > 0) return derived[0].id_program;
+
+  return null;
 }

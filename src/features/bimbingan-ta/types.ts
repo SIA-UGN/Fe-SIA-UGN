@@ -15,6 +15,15 @@ export interface ProgramOption {
   name: string;
 }
 
+export interface SubjectOption {
+  id_subject?: number;
+  id?: number;
+  name?: string;
+  name_subject?: string;
+  code_subject?: string;
+  sks?: number;
+}
+
 export interface BasicLecturer {
   id_user_si: number;
   name: string;
@@ -65,6 +74,8 @@ export interface ThesisTopic {
   updated_at?: string;
   lecturer?: BasicLecturer | null;
   program?: ProgramOption | null;
+  thesis_category?: Pick<ThesisCategory, 'id_thesis_category' | 'name' | 'description'> | null;
+  category?: Pick<ThesisCategory, 'id_thesis_category' | 'name' | 'description'> | null;
   student_theses?: Array<Pick<StudentThesis, 'id_student_thesis' | 'status'> & { student?: BasicStudent | null }>;
 }
 
@@ -173,6 +184,7 @@ export interface LecturerTopicPayload {
   description: string;
   quota?: number;
   id_program: number;
+  id_thesis_category?: number | null;
 }
 
 export interface LecturerConsultationPayload {

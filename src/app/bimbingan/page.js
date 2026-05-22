@@ -8,7 +8,7 @@ export default function BimbinganIndexPage() {
   const router = useRouter();
 
   useEffect(() => {
-    router.replace('/bimbingan/pengajuan-ta');
+    router.replace('/bimbingan-ta/mahasiswa/pengajuan');
   }, [router]);
 
   return <LoadingEffect message="Mengarahkan ke modul bimbingan..." />;

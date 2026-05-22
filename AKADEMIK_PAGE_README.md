@@ -6,7 +6,6 @@
 ## 🎯 Fitur Utama
 
 Halaman akademik yang **otomatis menampilkan tampilan berbeda** berdasarkan **role user yang login**:
-
 ### 1. **Role: MAHASISWA** (Read-Only)
 - ✅ Hanya dapat **melihat nilai** (tidak bisa edit)
 - ✅ Kolom tabel: **No, Kode Matkul, Mata Kuliah, SKS, Bobot, Nilai, Nilai x SKS**

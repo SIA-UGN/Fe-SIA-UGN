@@ -2,41 +2,54 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+<<<<<<< HEAD
+import { studentThesisApi } from '@/features/bimbingan-ta/api/student';
+import type { StudentThesisPayload, ThesisLecturer } from '@/features/bimbingan-ta/types';
+=======
 import { studentTaService } from '@/services/studentTaService';
 import type { Dosen, CreateTAPayload } from '@/services/taService';
+>>>>>>> origin/main-rio
 
 export function useAjukanTA() {
   const router = useRouter();
 
-  const [dosenList, setDosenList] = useState<Dosen[]>([]);
+  const [lecturers, setLecturers] = useState<ThesisLecturer[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isLoadingDosen, setIsLoadingDosen] = useState(true);
+  const [isLoadingLecturers, setIsLoadingLecturers] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  /* ── Fetch dosen list on mount ───────────────────────────── */
-  const fetchDosen = useCallback(async () => {
-    setIsLoadingDosen(true);
+  const fetchLecturers = useCallback(async () => {
+    setIsLoadingLecturers(true);
     try {
+<<<<<<< HEAD
+      const list = await studentThesisApi.getLecturers();
+      setLecturers(list);
+=======
       const list = await studentTaService.getLecturers();
       setDosenList(list as Dosen[]);
+>>>>>>> origin/main-rio
     } catch (err: any) {
-      console.error('[useAjukanTA] fetch dosen error:', err);
       setError(err?.userMessage ?? err?.message ?? 'Gagal memuat daftar dosen.');
     } finally {
-      setIsLoadingDosen(false);
+      setIsLoadingLecturers(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchDosen();
-  }, [fetchDosen]);
+    fetchLecturers();
+  }, [fetchLecturers]);
 
-  /* ── Submit handler ──────────────────────────────────────── */
   const onSubmit = useCallback(
-    async (payload: CreateTAPayload) => {
+    async (payload: StudentThesisPayload) => {
       setIsLoading(true);
       setError(null);
       try {
+<<<<<<< HEAD
+        await studentThesisApi.createThesis(payload);
+        router.push('/bimbingan-ta/mahasiswa/pengajuan');
+      } catch (err: any) {
+        setError(err?.userMessage ?? err?.message ?? 'Gagal mengajukan tugas akhir.');
+=======
         // Step 1 — buat pengajuan TA
         const formData = new FormData();
         formData.append('title_ind', payload.title_ind);
@@ -74,6 +87,7 @@ export function useAjukanTA() {
           err?.message ??
           'Gagal mengajukan tugas akhir.'
         );
+>>>>>>> origin/main-rio
       } finally {
         setIsLoading(false);
       }
@@ -81,5 +95,5 @@ export function useAjukanTA() {
     [router],
   );
 
-  return { onSubmit, isLoading, isLoadingDosen, dosenList, error };
+  return { onSubmit, isLoading, isLoadingLecturers, lecturers, error };
 }

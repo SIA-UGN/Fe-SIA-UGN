@@ -9,9 +9,9 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 
-export default function DataTable({ 
-  columns = [], 
-  data = [], 
+export default function DataTable({
+  columns = [],
+  data = [],
   actions = [],
   pagination = true,
   onEdit,
@@ -33,7 +33,7 @@ export default function DataTable({
 
   // Paginated data
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedData = pagination 
+  const paginatedData = pagination
     ? data.slice(startIndex, startIndex + itemsPerPage)
     : data;
 
@@ -43,7 +43,7 @@ export default function DataTable({
     if (customRender[column.key]) {
       return customRender[column.key](item[column.key], item);
     }
-    
+
     // Default render
     return item[column.key];
   };
@@ -56,7 +56,7 @@ export default function DataTable({
           <button
             onClick={() => onDetail && onDetail(item, index)}
             className="text-white p-2 transition shadow-sm hover:opacity-90"
-            style={{ 
+            style={{
               backgroundColor: '#0066CC',
               borderRadius: '12px',
               fontFamily: 'Urbanist, sans-serif'
@@ -71,7 +71,7 @@ export default function DataTable({
           <button
             onClick={() => onEdit && onEdit(item, index)}
             className="text-white p-2 transition shadow-sm hover:opacity-90"
-            style={{ 
+            style={{
               backgroundColor: '#16874B',
               borderRadius: '12px',
               fontFamily: 'Urbanist, sans-serif'
@@ -86,7 +86,7 @@ export default function DataTable({
           <button
             onClick={() => onDelete && onDelete(item, index)}
             className="text-white p-2 transition shadow-sm hover:opacity-90"
-            style={{ 
+            style={{
               backgroundColor: '#BE0414',
               borderRadius: '12px',
               fontFamily: 'Urbanist, sans-serif'
@@ -101,7 +101,7 @@ export default function DataTable({
           <button
             onClick={() => onActivate && onActivate(item, index)}
             className="text-white p-2 transition shadow-sm hover:opacity-90"
-            style={{ 
+            style={{
               backgroundColor: item.is_active ? '#BE0414' : '#16874B',
               borderRadius: '12px',
               fontFamily: 'Urbanist, sans-serif'
@@ -132,19 +132,19 @@ export default function DataTable({
           <thead className={headerClassName} style={{ backgroundColor: headerBackgroundColor }}>
             <tr className="hover:bg-transparent">
               {/* Number column */}
-              <th className="text-center font-semibold w-16 p-4" style={{ 
+              <th className="text-center font-semibold w-16 p-4" style={{
                 color: '#015023',
                 fontFamily: 'Urbanist, sans-serif'
               }}>
                 {nomertext}
               </th>
-              
+
               {/* Dynamic columns */}
               {columns.map((column) => (
-                <th 
-                  key={column.key} 
+                <th
+                  key={column.key}
                   className={`font-semibold p-4 text-center ${column.className || ''}`}
-                  style={{ 
+                  style={{
                     width: column.width,
                     color: '#015023',
                     fontFamily: 'Urbanist, sans-serif'
@@ -153,10 +153,10 @@ export default function DataTable({
                   {column.label}
                 </th>
               ))}
-              
+
               {/* Actions column */}
               {actions.length > 0 && (
-                <th className="text-center font-semibold p-4" style={{ 
+                <th className="text-center font-semibold p-4" style={{
                   color: '#015023',
                   fontFamily: 'Urbanist, sans-serif'
                 }}>
@@ -173,10 +173,10 @@ export default function DataTable({
                 <td className="text-center font-medium text-gray-600 p-4" style={{ fontFamily: 'Urbanist, sans-serif' }}>
                   {startIndex + index + 1}
                 </td>
-                
+
                 {/* Dynamic cells */}
                 {columns.map((column) => (
-                  <td 
+                  <td
                     key={column.key}
                     className={`p-4 text-center ${column.cellClassName || 'text-gray-700'}`}
                     style={{ fontFamily: 'Urbanist, sans-serif' }}
@@ -184,7 +184,7 @@ export default function DataTable({
                     {renderCell(item, column)}
                   </td>
                 ))}
-                
+
                 {/* Actions cell */}
                 {actions.length > 0 && (
                   <td className="p-4 text-center">
@@ -193,12 +193,12 @@ export default function DataTable({
                 )}
               </tr>
             ))}
-            
+
             {/* Empty state */}
             {paginatedData.length === 0 && (
               <tr>
-                <td 
-                  colSpan={columns.length + (actions.length > 0 ? 2 : 1)} 
+                <td
+                  colSpan={columns.length + (actions.length > 0 ? 2 : 1)}
                   className="text-center py-8 text-gray-500"
                   style={{ fontFamily: 'Urbanist, sans-serif' }}
                 >
@@ -217,7 +217,7 @@ export default function DataTable({
             <PaginationContent>
               {/* Previous Button */}
               <PaginationItem>
-                <PaginationPrevious 
+                <PaginationPrevious
                   href="#"
                   onClick={(e) => {
                     e.preventDefault();
@@ -226,7 +226,7 @@ export default function DataTable({
                   className={currentPage === 1 ? 'pointer-events-none opacity-50' : ''}
                 />
               </PaginationItem>
-              
+
               {/* Page Info */}
               <PaginationItem>
                 <span className="flex items-center gap-2 px-2 text-sm" style={{ fontFamily: 'Urbanist, sans-serif' }}>
@@ -241,7 +241,7 @@ export default function DataTable({
 
               {/* Next Button */}
               <PaginationItem>
-                <PaginationNext 
+                <PaginationNext
                   href="#"
                   onClick={(e) => {
                     e.preventDefault();

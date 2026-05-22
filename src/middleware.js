@@ -8,8 +8,10 @@ export function middleware(req) {
   const protectedRoutes = {
     '/admin/bimbingan': ['admin', 'manager'],
     '/admin/library': ['admin', 'manager'],
+    '/admin/ukt': ['admin', 'manager'],
     '/adminpage': ['admin', 'manager'],
     '/adminpage/tambahmanager': ['admin'],
+    '/dashboard/ukt': ['mahasiswa'],
     '/dashboard': ['mahasiswa', 'dosen'],
     '/hasil-studi': ['mahasiswa', 'dosen'],
     '/hasil-studi/input-nilai-mahasiswa': ['dosen'],

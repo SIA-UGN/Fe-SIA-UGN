@@ -1,7 +1,10 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { correspondenceService } from '@/types/correspondence';
+import { useState, useCallback } from 'react';
+import {
+    useCorrespondenceListQuery,
+    useDeleteCorrespondenceMutation,
+} from '@/features/persuratan/hooks/useCorrespondenceQueries';
 
 /**
  * Custom hook for the "Status Persuratan" page.
@@ -9,65 +12,46 @@ import { correspondenceService } from '@/types/correspondence';
  * and provides a delete function with optimistic update.
  */
 export function useStatusPersuratan() {
-    const [data, setData] = useState([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState(null);
-    const [isDeleting, setIsDeleting] = useState(false);
     const [deletingId, setDeletingId] = useState(null);
+    const [actionError, setActionError] = useState(null);
 
-    const fetchData = useCallback(async () => {
-        setIsLoading(true);
-        setError(null);
-        try {
-            const result = await correspondenceService.getAll();
-            setData(result || []);
-        } catch (err) {
-            console.error('[useStatusPersuratan] Error:', err);
-            setError(
-                err?.response?.data?.message ||
-                err?.message ||
-                'Gagal memuat data persuratan.'
-            );
-        } finally {
-            setIsLoading(false);
-        }
-    }, []);
-
-    useEffect(() => {
-        fetchData();
-    }, [fetchData]);
+    const listQuery = useCorrespondenceListQuery();
+    const deleteMutation = useDeleteCorrespondenceMutation();
 
     /**
      * Delete a letter by ID.
      * Optimistically removes the item from local state on success.
      */
     const deleteLetter = useCallback(async (id) => {
-        setIsDeleting(true);
         setDeletingId(id);
         try {
-            await correspondenceService.delete(id);
-            // Optimistic: remove from local state
-            setData((prev) => prev.filter((item) => item.id_correspondence !== id));
+            await deleteMutation.mutateAsync(id);
         } catch (err) {
             console.error('[useStatusPersuratan] Delete error:', err);
-            setError(
-                err?.response?.data?.message ||
+            setActionError(
+                err?.userMessage ||
                 err?.message ||
                 'Gagal menghapus surat.'
             );
         } finally {
-            setIsDeleting(false);
             setDeletingId(null);
         }
-    }, []);
+    }, [deleteMutation]);
+
+    const errorMessage =
+        actionError ||
+        listQuery.error?.userMessage ||
+        listQuery.error?.message ||
+        listQuery.error?.response?.data?.message ||
+        null;
 
     return {
-        data,
-        isLoading,
-        error,
-        isDeleting,
+        data: listQuery.data || [],
+        isLoading: listQuery.isLoading,
+        error: errorMessage,
+        isDeleting: deleteMutation.isPending,
         deletingId,
-        refetch: fetchData,
+        refetch: listQuery.refetch,
         deleteLetter,
     };
 }

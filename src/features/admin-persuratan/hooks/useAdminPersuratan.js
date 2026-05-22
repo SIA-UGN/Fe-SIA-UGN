@@ -1,18 +1,25 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { correspondenceService } from '@/types/correspondence';
+import { useState, useCallback, useMemo } from 'react';
+import {
+    useCorrespondenceCategoriesQuery,
+    useCorrespondenceListQuery,
+    useDeleteCorrespondenceMutation,
+    useUpdateCorrespondenceStatusMutation,
+} from '@/features/persuratan/hooks/useCorrespondenceQueries';
 
 /**
  * Custom hook for the Admin Persuratan page.
  * Manages data fetching, filtering, statistics, modal states, and CRUD operations.
  */
 export function useAdminPersuratan() {
-    // ── Raw data ──────────────────────────────────────────────────
-    const [allData, setAllData] = useState([]);
-    const [categories, setCategories] = useState([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState(null);
+    const listQuery = useCorrespondenceListQuery();
+    const categoriesQuery = useCorrespondenceCategoriesQuery();
+    const updateStatusMutation = useUpdateCorrespondenceStatusMutation();
+    const deleteMutation = useDeleteCorrespondenceMutation();
+
+    const allData = listQuery.data || [];
+    const categories = categoriesQuery.data || [];
 
     // ── Filter state ──────────────────────────────────────────────
     const [filterCategory, setFilterCategory] = useState('');
@@ -35,51 +42,15 @@ export function useAdminPersuratan() {
 
     // ── Success/Error feedback ────────────────────────────────────
     const [successMessage, setSuccessMessage] = useState(null);
+    const [actionError, setActionError] = useState(null);
 
-    // ── Fetch all data ────────────────────────────────────────────
-    const fetchData = useCallback(async () => {
-        setIsLoading(true);
-        setError(null);
-
-        const MAX_RETRIES = 2;
-        const RETRY_DELAY_MS = 3000;
-
-        for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-            try {
-                const [letters, cats] = await Promise.all([
-                    correspondenceService.getAll(),
-                    correspondenceService.getCategories(),
-                ]);
-                setAllData(letters || []);
-                setCategories(cats || []);
-                setIsLoading(false);
-                return;
-            } catch (err) {
-                const isLast = attempt === MAX_RETRIES;
-                const isConnectivity = err?.isConnectivityError || err?.code === 'ECONNABORTED';
-
-                if (!isLast && isConnectivity) {
-                    await new Promise((res) => setTimeout(res, RETRY_DELAY_MS));
-                    continue;
-                }
-
-                console.error('[useAdminPersuratan] Fetch error:', err);
-                setError(
-                    err?.userMessage ||
-                    err?.response?.data?.message ||
-                    err?.message ||
-                    'Gagal memuat data persuratan'
-                );
-                break;
-            }
-        }
-
-        setIsLoading(false);
-    }, []);
-
-    useEffect(() => {
-        fetchData();
-    }, [fetchData]);
+    const error =
+        actionError ||
+        listQuery.error?.userMessage ||
+        listQuery.error?.message ||
+        categoriesQuery.error?.userMessage ||
+        categoriesQuery.error?.message ||
+        null;
 
     // ── Computed statistics ───────────────────────────────────────
     const stats = useMemo(() => {
@@ -155,42 +126,36 @@ export function useAdminPersuratan() {
     const handleUpdateStatus = useCallback(async (id, newStatus) => {
         setIsUpdatingStatus(true);
         try {
-            await correspondenceService.updateStatus(id, newStatus);
-            // Update local state
-            setAllData(prev =>
-                prev.map(s => s.id_correspondence === id ? { ...s, status: newStatus } : s)
-            );
+            await updateStatusMutation.mutateAsync({ id, status: newStatus });
             setSuccessMessage('Status surat berhasil diperbarui');
             closeStatusModal();
             setTimeout(() => setSuccessMessage(null), 3000);
             return true;
         } catch (err) {
             console.error('[useAdminPersuratan] Update status error:', err);
-            setError(err?.response?.data?.message || 'Gagal mengubah status surat');
+            setActionError(err?.message || 'Gagal mengubah status surat.');
             return false;
         } finally {
             setIsUpdatingStatus(false);
         }
-    }, [closeStatusModal]);
+    }, [closeStatusModal, updateStatusMutation]);
 
     const handleDelete = useCallback(async (id) => {
         setIsDeleting(true);
         try {
-            await correspondenceService.delete(id);
-            // Remove from local state
-            setAllData(prev => prev.filter(s => s.id_correspondence !== id));
+            await deleteMutation.mutateAsync(id);
             setSuccessMessage('Surat berhasil dihapus');
             closeDeleteModal();
             setTimeout(() => setSuccessMessage(null), 3000);
             return true;
         } catch (err) {
             console.error('[useAdminPersuratan] Delete error:', err);
-            setError(err?.response?.data?.message || 'Gagal menghapus surat');
+            setActionError(err?.message || 'Gagal menghapus surat.');
             return false;
         } finally {
             setIsDeleting(false);
         }
-    }, [closeDeleteModal]);
+    }, [closeDeleteModal, deleteMutation]);
 
     // ── Clear filters ─────────────────────────────────────────────
     const clearFilters = useCallback(() => {
@@ -206,7 +171,7 @@ export function useAdminPersuratan() {
         data: filteredData,
         allData,
         categories,
-        isLoading,
+        isLoading: listQuery.isLoading || categoriesQuery.isLoading,
         error,
         successMessage,
         stats,
@@ -236,6 +201,6 @@ export function useAdminPersuratan() {
         isDeleting,
 
         // Refresh
-        refetch: fetchData,
+        refetch: listQuery.refetch,
     };
 }
