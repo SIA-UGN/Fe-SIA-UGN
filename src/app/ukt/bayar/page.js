@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic';
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { 
   Home, ChevronRight, CheckCircle, Clock, 
   Copy, CreditCard, Smartphone, ChevronDown, 
@@ -17,12 +17,21 @@ import { fetchStudentPaymentDetail, fetchStudentPaymentStatus, submitStudentPaym
 
 export default function UktPaymentPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const transactionId = Number(searchParams.get('transaction')) || null;
-  const transactionVaNumber = searchParams.get('va');
-  const transactionBankCode = searchParams.get('bank');
-  const transactionAmount = Number(searchParams.get('amount')) || null;
-  const transactionExpiry = searchParams.get('expiry');
+  const [transactionId, setTransactionId] = useState(null);
+  const [transactionVaNumber, setTransactionVaNumber] = useState(null);
+  const [transactionBankCode, setTransactionBankCode] = useState(null);
+  const [transactionAmount, setTransactionAmount] = useState(null);
+  const [transactionExpiry, setTransactionExpiry] = useState(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const sp = new URLSearchParams(window.location.search);
+    setTransactionId(Number(sp.get('transaction')) || null);
+    setTransactionVaNumber(sp.get('va'));
+    setTransactionBankCode(sp.get('bank'));
+    setTransactionAmount(Number(sp.get('amount')) || null);
+    setTransactionExpiry(sp.get('expiry'));
+  }, []);
 
   const [isCopied, setIsCopied] = useState(false);
   const [openAccordion, setOpenAccordion] = useState('atm');

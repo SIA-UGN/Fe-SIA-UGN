@@ -4,7 +4,6 @@ export const dynamic = 'force-dynamic';
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
 import { 
   Home, ChevronRight, CheckCircle, Download, 
   FileText, Sparkles, Check, Loader2, AlertCircle, RefreshCw
@@ -15,8 +14,13 @@ import { toast } from 'sonner';
 import { downloadStudentTuitionReceipt, fetchStudentPaymentDetail } from '@/features/ukt/services/tuitionService';
 
 export default function UktSuccessPage() {
-  const searchParams = useSearchParams();
-  const paymentId = Number(searchParams.get('payment')) || null;
+  const [paymentId, setPaymentId] = useState(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const sp = new URLSearchParams(window.location.search);
+    setPaymentId(Number(sp.get('payment')) || null);
+  }, []);
 
   const [isLoadingPayment, setIsLoadingPayment] = useState(!!paymentId);
   const [error, setError] = useState(null);
