@@ -228,6 +228,30 @@ export async function fetchStudentPaymentDetail(id: number) {
   }
 }
 
+export async function downloadStudentTuitionReceipt(id: number) {
+  try {
+    const response = await api.get(`/student/tuition/receipt/${id}`, {
+      responseType: 'blob',
+      headers: {
+        Accept: 'application/pdf',
+      },
+    });
+
+    return {
+      blob: response.data,
+      message: 'Kwitansi berhasil diunduh.',
+    };
+  } catch (error) {
+    const status = error?.response?.status || null;
+    const fallbackMessage =
+      status === 404
+        ? 'Endpoint kwitansi belum tersedia di backend.'
+        : 'Gagal mengunduh kwitansi.';
+
+    throw toDomainError(error, fallbackMessage);
+  }
+}
+
 export async function submitStudentPayment(
   tuitionFeeId: number,
   payload: {

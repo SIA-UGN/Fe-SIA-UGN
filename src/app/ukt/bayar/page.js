@@ -1,31 +1,119 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { 
   Home, ChevronRight, CheckCircle, Clock, 
   Copy, CreditCard, Smartphone, ChevronDown, 
-  ChevronUp, ExternalLink, Check, RefreshCw
+  ChevronUp, ExternalLink, Check, RefreshCw, Loader2, AlertCircle, Upload
 } from 'lucide-react';
 import Navbar from '@/components/ui/navigation-menu';
 import Footer from '@/components/ui/footer';
 import { toast } from 'sonner';
+import { fetchStudentPaymentDetail, fetchStudentPaymentStatus, submitStudentPayment } from '@/features/ukt/services/tuitionService';
 
 export default function UktPaymentPage() {
   const router = useRouter();
-  const [isCopied, setIsCopied] = useState(false);
-  const [openAccordion, setOpenAccordion] = useState('atm'); // Default buka ATM
-  const [isSyncing, setIsSyncing] = useState(false);
+  const searchParams = useSearchParams();
+  const transactionId = Number(searchParams.get('transaction')) || null;
+  const transactionVaNumber = searchParams.get('va');
+  const transactionBankCode = searchParams.get('bank');
+  const transactionAmount = Number(searchParams.get('amount')) || null;
+  const transactionExpiry = searchParams.get('expiry');
 
-  // --- DUMMY DATA TRANSAKSI ---
-  const transaction = {
-    idTransaksi: 'TRX-1778229571883',
-    metode: 'Bank BNI',
-    namaMetode: 'Transfer Bank BNI (Virtual Account)',
-    vaNumber: '98812021010001',
-    nominal: 3500000,
-    batasWaktu: '9 Mei 2026 pukul 15.39 WIB'
+  const [isCopied, setIsCopied] = useState(false);
+  const [openAccordion, setOpenAccordion] = useState('atm');
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [isLoadingTransaction, setIsLoadingTransaction] = useState(!!transactionId);
+  const [error, setError] = useState(null);
+  const [transactionData, setTransactionData] = useState(null);
+  const [paymentStatusData, setPaymentStatusData] = useState(null);
+  const [paymentProofFile, setPaymentProofFile] = useState(null);
+  const [isUploading, setIsUploading] = useState(false);
+
+  // --- FETCH TRANSACTION DETAILS ---
+  const fetchTransactionDetails = useCallback(async () => {
+    if (!transactionId) {
+      setError('No transaction selected. Please go back to checkout.');
+      return;
+    }
+    setIsLoadingTransaction(true);
+    setError(null);
+    try {
+      const response = await fetchStudentPaymentDetail(transactionId);
+      setTransactionData(response?.payment);
+
+      const tuitionFeeId = response?.payment?.tuition_fee?.id_tuition_fee;
+      if (tuitionFeeId) {
+        try {
+          const statusResponse = await fetchStudentPaymentStatus(tuitionFeeId);
+          setPaymentStatusData(statusResponse?.status ?? null);
+        } catch (statusError) {
+          console.error('Error fetching payment status:', statusError);
+          setPaymentStatusData(null);
+        }
+      } else {
+        setPaymentStatusData(null);
+      }
+    } catch (err) {
+      setError(err?.message ?? 'Gagal memuat detail transaksi');
+      console.error('Error fetching transaction:', err);
+    } finally {
+      setIsLoadingTransaction(false);
+    }
+  }, [transactionId]);
+
+  useEffect(() => {
+    if (transactionId) {
+      fetchTransactionDetails();
+    }
+  }, [transactionId, fetchTransactionDetails]);
+
+  // --- DUMMY DATA TRANSAKSI (as fallback) ---
+  const resolvedVaNumber = paymentStatusData?.midtrans_va_number
+    ?? transactionData?.midtrans_va_number
+    ?? transactionData?.virtual_account_number
+    ?? transactionVaNumber
+    ?? 'N/A';
+
+  const resolvedNominal = transactionData?.tuition_fee?.final_amount
+    ?? transactionAmount
+    ?? 0;
+
+  const resolvedExpiry = paymentStatusData?.midtrans_expiry_time
+    ?? transactionExpiry
+    ?? null;
+
+  const transaction = transactionData ? {
+    idTransaksi: transactionData.id_tuition_payment?.toString() ?? 'TRX-Unknown',
+    metode: paymentStatusData?.midtrans_va_bank?.toUpperCase() ?? transactionBankCode?.toUpperCase() ?? 'Bank Transfer',
+    namaMetode: paymentStatusData?.midtrans_va_bank
+      ? `Transfer ${paymentStatusData.midtrans_va_bank.toUpperCase()} (Virtual Account)`
+      : transactionBankCode
+        ? `Transfer ${transactionBankCode.toUpperCase()} (Virtual Account)`
+        : 'Virtual Account',
+    vaNumber: resolvedVaNumber,
+    nominal: resolvedNominal,
+    batasWaktu: resolvedExpiry
+      ? new Date(resolvedExpiry).toLocaleDateString('id-ID', { month: 'long', day: 'numeric', year: 'numeric' })
+      : 'Unknown'
+  } : transactionVaNumber ? {
+    idTransaksi: transactionId?.toString() ?? 'TRX-Unknown',
+    metode: transactionBankCode ? `${transactionBankCode.toUpperCase()} (VA)` : 'Virtual Account',
+    namaMetode: transactionBankCode ? `Transfer ${transactionBankCode.toUpperCase()} (Virtual Account)` : 'Virtual Account',
+    vaNumber: transactionVaNumber,
+    nominal: transactionAmount ?? 0,
+    batasWaktu: transactionExpiry ? new Date(transactionExpiry).toLocaleDateString('id-ID', { month: 'long', day: 'numeric', year: 'numeric' }) : 'Unknown'
+  } : {
+    idTransaksi: transactionId?.toString() ?? 'TRX-Unknown',
+    metode: transactionBankCode ? `${transactionBankCode.toUpperCase()} (VA)` : 'Virtual Account',
+    namaMetode: transactionBankCode ? `Transfer ${transactionBankCode.toUpperCase()} (Virtual Account)` : 'Virtual Account',
+    vaNumber: resolvedVaNumber,
+    nominal: resolvedNominal,
+    batasWaktu: resolvedExpiry
+      ? new Date(resolvedExpiry).toLocaleDateString('id-ID', { month: 'long', day: 'numeric', year: 'numeric' })
+      : 'Unknown'
   };
 
   // --- ALUR PEMBAYARAN (STEPPER) ---
@@ -47,6 +135,54 @@ export default function UktPaymentPage() {
     setTimeout(() => setIsCopied(false), 2000);
   };
 
+  const handlePaymentProofChange = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (!file.type.startsWith('image/') && !file.type.includes('pdf')) {
+        toast.error('File harus berupa gambar atau PDF');
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error('Ukuran file tidak boleh lebih dari 5MB');
+        return;
+      }
+      setPaymentProofFile(file);
+      toast.success('File berhasil dipilih');
+    }
+  };
+
+  const handleSubmitPaymentProof = async () => {
+    if (!paymentProofFile || !transactionId) {
+      toast.error('Pilih file bukti pembayaran');
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const response = await submitStudentPayment(transactionId, {
+        payment_proof: paymentProofFile,
+        payment_method: 'bank_transfer',
+      });
+      toast.success('Bukti pembayaran berhasil diunggah. Menunggu verifikasi...');
+      
+      // Redirect to success page after upload
+      setTimeout(() => {
+        router.push(`/ukt/success?payment=${transactionId}`);
+      }, 1500);
+    } catch (err) {
+      // Handle validation errors (422)
+      if (err?.validationErrors) {
+        const errorMsg = Object.values(err.validationErrors).flat().join(', ');
+        toast.error(errorMsg);
+      } else {
+        toast.error(err?.message ?? 'Gagal mengunggah bukti pembayaran');
+      }
+      console.error('Upload error:', err);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const handleBatalkan = () => {
     const confirm = window.confirm('Yakin ingin membatalkan transaksi ini?');
     if (confirm) {
@@ -57,9 +193,13 @@ export default function UktPaymentPage() {
 
   const handleCekStatus = async () => {
     setIsSyncing(true);
-    toast .info('Mengecek status pembayaran...');
-    router.push('/ukt/success');
-    };
+    toast.info('Mengecek status pembayaran...');
+    // Fetch latest transaction status before redirecting
+    await fetchTransactionDetails();
+    setTimeout(() => {
+      router.push(`/ukt/success?payment=${transactionId}`);
+    }, 1000);
+  };
 
   return (
     <div className="min-h-screen flex flex-col bg-[#f4f7f5] font-urbanist">
@@ -87,17 +227,44 @@ export default function UktPaymentPage() {
           </p>
         </div>
 
-        {/* --- STATUS TRANSAKSI (CENTERED) --- */}
-        <div className="flex flex-col items-center justify-center mb-10 mt-4">
-          <div className="w-16 h-16 bg-[#DABC4E] rounded-full flex items-center justify-center mb-4 shadow-sm border-4 border-yellow-100">
-            <Check className="w-8 h-8 text-[#015023]" strokeWidth={3} />
+        {/* --- ERROR ALERT --- */}
+        {error && (
+          <div className="mb-6 flex items-start gap-4 p-4 bg-red-50 border border-red-200 rounded-xl">
+            <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-red-900">{error}</p>
+            </div>
+            <button
+              onClick={fetchTransactionDetails}
+              className="text-red-600 hover:text-red-800 transition-colors"
+            >
+              <RefreshCw className="w-4 h-4" />
+            </button>
           </div>
-          <h2 className="text-2xl font-bold text-[#015023] mb-1">Transaksi Dibuat</h2>
-          <p className="text-gray-500 text-sm">Lakukan pembayaran sebelum batas waktu berakhir</p>
-        </div>
+        )}
 
-        {/* --- MAIN LAYOUT (2 COLUMNS) --- */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+        {/* --- LOADING UI --- */}
+        {isLoadingTransaction && (
+          <div className="flex justify-center items-center py-12">
+            <div className="text-center">
+              <Loader2 className="w-8 h-8 text-[#015023] animate-spin mx-auto mb-2" />
+              <p className="text-gray-500">Memuat detail transaksi...</p>
+            </div>
+          </div>
+        )}
+
+        {!isLoadingTransaction && !error && (
+          <>
+            <div className="flex flex-col items-center justify-center mb-10 mt-4">
+              <div className="w-16 h-16 bg-[#DABC4E] rounded-full flex items-center justify-center mb-4 shadow-sm border-4 border-yellow-100">
+                <Check className="w-8 h-8 text-[#015023]" strokeWidth={3} />
+              </div>
+              <h2 className="text-2xl font-bold text-[#015023] mb-1">Transaksi Dibuat</h2>
+              <p className="text-gray-500 text-sm">Lakukan pembayaran sebelum batas waktu berakhir</p>
+            </div>
+
+            {/* --- MAIN LAYOUT (2 COLUMNS) --- */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
           
           {/* KOLOM KIRI (Detail VA & Panduan) */}
           <div className="lg:col-span-2 flex flex-col gap-6">
@@ -244,6 +411,49 @@ export default function UktPaymentPage() {
               </div>
 
             </div>
+
+            {/* 3. Container Upload Bukti Pembayaran */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 md:p-8 mt-6">
+              <h2 className="text-lg font-bold text-[#015023] mb-6">Upload Bukti Pembayaran</h2>
+              <p className="text-sm text-gray-600 mb-6">Unggah bukti pembayaran Anda untuk verifikasi. Format: JPG, PNG, atau PDF (Max 5MB)</p>
+              
+              {paymentProofFile && (
+                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between">
+                  <span className="text-sm font-medium text-blue-900">{paymentProofFile.name}</span>
+                  <button
+                    onClick={() => setPaymentProofFile(null)}
+                    className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                  >
+                    Ubah
+                  </button>
+                </div>
+              )}
+
+              <div className="border-2 border-dashed border-gray-200 rounded-xl p-8 text-center hover:bg-gray-50 transition-colors mb-6">
+                <label className="cursor-pointer">
+                  <input
+                    type="file"
+                    onChange={handlePaymentProofChange}
+                    accept="image/*,.pdf"
+                    className="hidden"
+                  />
+                  <div className="flex flex-col items-center">
+                    <Upload className="w-8 h-8 text-gray-400 mb-2" />
+                    <span className="text-sm font-medium text-gray-700">Klik atau drag file di sini</span>
+                    <span className="text-xs text-gray-500">JPG, PNG, atau PDF</span>
+                  </div>
+                </label>
+              </div>
+
+              <button
+                onClick={handleSubmitPaymentProof}
+                disabled={!paymentProofFile || isUploading}
+                className="w-full py-3.5 rounded-xl font-bold text-white bg-[#015023] hover:bg-[#013d1b] transition-all flex items-center justify-center gap-2 shadow-sm disabled:opacity-70"
+              >
+                {isUploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5" />}
+                {isUploading ? 'Mengunggah...' : 'Submit Bukti Pembayaran'}
+              </button>
+            </div>
           </div>
 
           {/* KOLOM KANAN (Alur Pembayaran / Stepper) */}
@@ -293,7 +503,9 @@ export default function UktPaymentPage() {
             </div>
           </div>
 
-        </div>
+            </div>
+          </>
+        )}
 
       </main>
 

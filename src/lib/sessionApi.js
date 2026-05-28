@@ -25,6 +25,44 @@ const getFirstValidationMessage = (errors) => {
 	return `${firstKey}: ${firstMessage}`;
 };
 
+const normalizeLoginMessage = (status, serverMessage) => {
+	const message = String(serverMessage || '').toLowerCase();
+
+	if (
+		status === 404 ||
+		message.includes('not found') ||
+		message.includes('tidak ditemukan') ||
+		message.includes('belum terdaftar') ||
+		message.includes('account does not exist') ||
+		message.includes('user does not exist')
+	) {
+		return 'Akun belum terdaftar.';
+	}
+
+	if (
+		status === 401 ||
+		message.includes('credentials are incorrect') ||
+		message.includes('email atau password salah') ||
+		message.includes('invalid credentials')
+	) {
+		return 'Email atau password salah.';
+	}
+
+	if (status === 422) {
+		return serverMessage || 'Data yang dikirim tidak valid.';
+	}
+
+	if (status === 429) {
+		return 'Terlalu banyak percobaan. Silakan coba lagi nanti.';
+	}
+
+	if (status >= 500) {
+		return `Terjadi kesalahan pada server (${status}).`;
+	}
+
+	return serverMessage;
+};
+
 const normalizeLoginError = (error) => {
 	const serverData = error?.response?.data;
 	const validationMessage = getFirstValidationMessage(serverData?.errors);
@@ -32,23 +70,15 @@ const normalizeLoginError = (error) => {
 		validationMessage ||
 		serverData?.message ||
 		serverData?.error;
-
-	if (serverData && typeof serverData === 'object' && serverMessage) {
-		return { ...serverData, message: serverMessage };
-	}
-
 	const status = error?.response?.status;
-	if (status === 401) {
-		return { message: 'Email atau password salah.', status };
+	const normalizedMessage = normalizeLoginMessage(status, serverMessage);
+
+	if (serverData && typeof serverData === 'object' && normalizedMessage) {
+		return { ...serverData, message: normalizedMessage, status };
 	}
-	if (status === 422) {
-		return { message: serverMessage || 'Data yang dikirim tidak valid.', status };
-	}
-	if (status === 429) {
-		return { message: 'Terlalu banyak percobaan. Silakan coba lagi nanti.', status };
-	}
-	if (status >= 500) {
-		return { message: `Terjadi kesalahan pada server (${status}).`, status };
+
+	if (normalizedMessage) {
+		return { message: normalizedMessage, status };
 	}
 
 	if (error?.userMessage || error?.message) {

@@ -1,14 +1,16 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { 
   Home, ChevronRight, ArrowLeft, Check, 
-  ChevronDown, Rocket, Loader2 
+  ChevronDown, Rocket, Loader2, AlertCircle, RefreshCw
 } from 'lucide-react';
 import Navbar from '@/components/ui/navigation-menu';
 import Footer from '@/components/ui/footer';
+import { fetchStudentTuitionBillDetail, checkoutStudentTuition } from '@/features/ukt/services/tuitionService';
+import { toast } from 'sonner';
 
 // --- Komponen Custom Select untuk Bank ---
 const CustomBankSelect = ({ value, onChange, options }) => {
@@ -74,15 +76,51 @@ const CustomBankSelect = ({ value, onChange, options }) => {
 
 export default function UktCheckoutPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const billId = Number(searchParams.get('bill')) || null;
+
   const [selectedBank, setSelectedBank] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [billData, setBillData] = useState(null);
+  const [isLoadingBill, setIsLoadingBill] = useState(!!billId);
+  const [error, setError] = useState(null);
 
-  // --- DUMMY DATA RINGKASAN ---
-  const ringkasan = {
-    tagihan: 'UKT Genap 2025/2026',
-    golongan: 'Tingkat 3',
-    jatuhTempo: '28 Februari 2026',
-    nominal: 3500000
+  // --- FETCH BILL DETAILS ---
+  const fetchBillDetails = useCallback(async () => {
+    if (!billId) {
+      setError('No bill selected. Please go back and select a bill.');
+      return;
+    }
+    setIsLoadingBill(true);
+    setError(null);
+    try {
+      const response = await fetchStudentTuitionBillDetail(billId);
+      setBillData(response?.bill);
+    } catch (err) {
+      setError(err?.message ?? 'Gagal memuat detail tagihan');
+      console.error('Error fetching bill:', err);
+    } finally {
+      setIsLoadingBill(false);
+    }
+  }, [billId]);
+
+  useEffect(() => {
+    if (billId) {
+      fetchBillDetails();
+    }
+  }, [billId, fetchBillDetails]);
+
+  // --- DERIVED DATA FROM BILL ---
+  const ringkasan = billData ? {
+    tagihan: billData.academic_period?.name ?? 'Unknown',
+    golongan: billData.tuition_rate?.group_name ?? 'Unknown',
+    jatuhTempo: billData.due_date ? new Date(billData.due_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : '-',
+    nominal: billData.final_amount
+  } : {
+    tagihan: 'Loading...',
+    golongan: '-',
+    jatuhTempo: '-',
+    nominal: 0
   };
 
   const bankOptions = [
@@ -90,7 +128,6 @@ export default function UktCheckoutPage() {
     { label: 'Bank Mandiri (Virtual Account)', value: 'mandiri' },
     { label: 'Bank BRI (Virtual Account)', value: 'bri' },
     { label: 'Bank BCA (Virtual Account)', value: 'bca' },
-    { label: 'Bank Syariah Indonesia (BSI)', value: 'bsi' },
   ];
 
   // --- ALUR PEMBAYARAN (STEPPER) ---
@@ -106,15 +143,42 @@ export default function UktCheckoutPage() {
   };
 
   const handleCheckout = async () => {
-    if (!selectedBank) return;
+    if (!selectedBank || !billId) {
+      toast.error('Pilih metode pembayaran dan tagihan');
+      return;
+    }
     
     setIsSubmitting(true);
-    // Simulasi hit API untuk generate Virtual Account
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    // Redirect ke halaman Langkah 3 (Bayar/Instruksi VA)
-    // Asumsi rutenya adalah /ukt/bayar
-    router.push('/ukt/bayar'); 
+    try {
+      const response = await checkoutStudentTuition(billId, selectedBank);
+      if (response?.transaction) {
+        toast.success('Transaksi pembayaran berhasil dibuat');
+        const transaction = response.transaction;
+        const params = new URLSearchParams({
+          transaction: String(transaction.id_tuition_payment),
+        });
+
+        if (transaction.va_number) {
+          params.set('va', transaction.va_number);
+        }
+        if (transaction.midtrans_va_bank) {
+          params.set('bank', transaction.midtrans_va_bank);
+        }
+        if (transaction.amount !== undefined && transaction.amount !== null) {
+          params.set('amount', String(transaction.amount));
+        }
+        if (transaction.expiry_time) {
+          params.set('expiry', transaction.expiry_time);
+        }
+
+        router.push(`/ukt/bayar?${params.toString()}`);
+      }
+    } catch (err) {
+      toast.error(err?.message ?? 'Gagal membuat transaksi pembayaran');
+      console.error('Checkout error:', err);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -152,11 +216,38 @@ export default function UktCheckoutPage() {
           Kembali ke Daftar Tagihan
         </Link>
 
+        {/* --- ERROR ALERT --- */}
+        {error && (
+          <div className="mb-6 flex items-start gap-4 p-4 bg-red-50 border border-red-200 rounded-xl">
+            <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-red-900">{error}</p>
+            </div>
+            <button
+              onClick={fetchBillDetails}
+              className="text-red-600 hover:text-red-800 transition-colors"
+            >
+              <RefreshCw className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
+        {/* --- LOADING UI --- */}
+        {isLoadingBill && (
+          <div className="flex justify-center items-center py-12">
+            <div className="text-center">
+              <Loader2 className="w-8 h-8 text-[#015023] animate-spin mx-auto mb-2" />
+              <p className="text-gray-500">Memuat detail tagihan...</p>
+            </div>
+          </div>
+        )}
+
         {/* --- MAIN LAYOUT (2 COLUMNS) --- */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-          
-          {/* KOLOM KIRI (Pilihan Bank & Ringkasan) */}
-          <div className="lg:col-span-2 flex flex-col gap-6">
+        {!isLoadingBill && !error && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+            
+            {/* KOLOM KIRI (Pilihan Bank & Ringkasan) */}
+            <div className="lg:col-span-2 flex flex-col gap-6">
             
             {/* 1. Container Pilih Metode Pembayaran */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 md:p-8">
@@ -277,6 +368,7 @@ export default function UktCheckoutPage() {
           </div>
 
         </div>
+        )}
 
       </main>
 

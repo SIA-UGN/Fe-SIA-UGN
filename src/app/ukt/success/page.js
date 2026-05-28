@@ -1,17 +1,57 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { 
   Home, ChevronRight, CheckCircle, Download, 
-  FileText, Sparkles, Check 
+  FileText, Sparkles, Check, Loader2, AlertCircle, RefreshCw
 } from 'lucide-react';
 import Navbar from '@/components/ui/navigation-menu';
 import Footer from '@/components/ui/footer';
+import { toast } from 'sonner';
+import { downloadStudentTuitionReceipt, fetchStudentPaymentDetail } from '@/features/ukt/services/tuitionService';
 
 export default function UktSuccessPage() {
-  // --- DUMMY DATA TRANSAKSI BERHASIL ---
-  const transaction = {
+  const searchParams = useSearchParams();
+  const paymentId = Number(searchParams.get('payment')) || null;
+
+  const [isLoadingPayment, setIsLoadingPayment] = useState(!!paymentId);
+  const [error, setError] = useState(null);
+  const [paymentData, setPaymentData] = useState(null);
+
+  // --- FETCH PAYMENT STATUS ---
+  const fetchPaymentStatus = useCallback(async () => {
+    if (!paymentId) {
+      setError('No payment found. Please complete a payment first.');
+      return;
+    }
+    setIsLoadingPayment(true);
+    setError(null);
+    try {
+      const response = await fetchStudentPaymentDetail(paymentId);
+      setPaymentData(response?.payment);
+    } catch (err) {
+      setError(err?.message ?? 'Gagal memuat status pembayaran');
+      console.error('Error fetching payment status:', err);
+    } finally {
+      setIsLoadingPayment(false);
+    }
+  }, [paymentId]);
+
+  useEffect(() => {
+    if (paymentId) {
+      fetchPaymentStatus();
+    }
+  }, [paymentId, fetchPaymentStatus]);
+
+  // --- DUMMY DATA TRANSAKSI BERHASIL (as fallback) ---
+  const transaction = paymentData ? {
+    idTransaksi: paymentData.id_tuition_payment?.toString() ?? 'TRX-Unknown',
+    nominal: paymentData.tuition_fee?.final_amount ?? paymentData.amount_paid ?? 0,
+    waktuPembayaran: paymentData.verified_date ? new Date(paymentData.verified_date).toLocaleDateString('id-ID', { month: 'long', day: 'numeric', year: 'numeric' }) : '-',
+    status: paymentData.status === 'verified' ? 'Lunas' : 'Pending'
+  } : {
     idTransaksi: 'TRX-1778229571883',
     nominal: 3500000,
     waktuPembayaran: '8 Mei 2026 pukul 15.52 WIB',
@@ -32,45 +72,31 @@ export default function UktSuccessPage() {
 
   const handleDownloadKwitansi = async () => {
     try {
-      // 1. Munculkan loading state (bisa menggunakan toast)
+      if (!paymentData?.id_tuition_payment) {
+        toast.error('ID pembayaran tidak ditemukan');
+        return;
+      }
+
       toast.loading('Sedang menyiapkan kwitansi Anda...', { id: 'download-pdf' });
 
-      // 2. Lakukan request ke Backend API Anda
-      // Ganti URL dengan endpoint backend Anda yang men-generate PDF
-      const response = await fetch(`/api/ukt/receipt/${transaction.idTransaksi}`, {
-        method: 'GET',
-        headers: {
-          // 'Authorization': `Bearer ${token}` // Jika menggunakan auth
-          'Accept': 'application/pdf',
-        },
-      });
+      const response = await downloadStudentTuitionReceipt(paymentData.id_tuition_payment);
+      const blob = response?.blob;
 
-      if (!response.ok) throw new Error('Gagal mengunduh kwitansi');
+      if (!blob) throw new Error('Gagal mengunduh kwitansi');
 
-      // 3. Konversi response ke bentuk Blob (Binary Large Object)
-      const blob = await response.blob();
-
-      // 4. Buat URL sementara untuk Blob tersebut
       const downloadUrl = window.URL.createObjectURL(blob);
-
-      // 5. Buat elemen <a> bayangan untuk memicu download di browser
       const link = document.createElement('a');
       link.href = downloadUrl;
-      
-      // Beri nama file yang rapi
-      link.download = `Kwitansi_UKT_Genap2026_${transaction.idTransaksi}.pdf`; 
-      
-      // Eksekusi download dan bersihkan URL
+      link.download = `Kwitansi_UKT_${paymentData.id_tuition_payment}.pdf`;
       document.body.appendChild(link);
       link.click();
       link.remove();
       window.URL.revokeObjectURL(downloadUrl);
 
       toast.success('Kwitansi berhasil diunduh!', { id: 'download-pdf' });
-
     } catch (error) {
-      console.error(error);
-      toast.error('Terjadi kesalahan saat mengunduh kwitansi.', { id: 'download-pdf' });
+      console.error(error?.message ?? error);
+      toast.error(error?.message ?? 'Terjadi kesalahan saat mengunduh kwitansi.', { id: 'download-pdf' });
     }
   };
 
@@ -100,8 +126,36 @@ export default function UktSuccessPage() {
           </p>
         </div>
 
-        {/* --- MAIN LAYOUT (2 COLUMNS) --- */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start relative z-10">
+        {/* --- ERROR ALERT --- */}
+        {error && (
+          <div className="mb-6 flex items-start gap-4 p-4 bg-red-50 border border-red-200 rounded-xl">
+            <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-red-900">{error}</p>
+            </div>
+            <button
+              onClick={fetchPaymentStatus}
+              className="text-red-600 hover:text-red-800 transition-colors"
+            >
+              <RefreshCw className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
+        {/* --- LOADING UI --- */}
+        {isLoadingPayment && (
+          <div className="flex justify-center items-center py-12">
+            <div className="text-center">
+              <Loader2 className="w-8 h-8 text-[#015023] animate-spin mx-auto mb-2" />
+              <p className="text-gray-500">Memuat status pembayaran...</p>
+            </div>
+          </div>
+        )}
+
+        {!isLoadingPayment && !error && (
+          <>
+            {/* --- MAIN LAYOUT (2 COLUMNS) --- */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start relative z-10">
           
           {/* KOLOM KIRI (Success Card) */}
           <div className="lg:col-span-2">
@@ -242,7 +296,9 @@ export default function UktSuccessPage() {
             </div>
           </div>
 
-        </div>
+            </div>
+          </>
+        )}
 
       </main>
 

@@ -1,14 +1,15 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { 
   Home, ChevronRight, ArrowRight, CheckCircle, 
-  Download, FileStack, Check, X 
+  Download, FileStack, Check, X, Loader2, AlertCircle, RefreshCw
 } from 'lucide-react';
 import Navbar from '@/components/ui/navigation-menu';
 import Footer from '@/components/ui/footer';
 import { toast } from 'sonner';
+import { fetchStudentTuitionBills, fetchStudentPaymentHistory } from '@/features/ukt/services/tuitionService';
 
 export default function StudentUktMainPage() {
 
@@ -16,32 +17,69 @@ export default function StudentUktMainPage() {
   const [selectedIds, setSelectedIds] = useState([]);
   const [isDownloadingBulk, setIsDownloadingBulk] = useState(false);
 
-  // --- DUMMY DATA ---
-  const tagihanAktif = {
-    semester: 'Semester Genap 2025/2026',
-    tahunAkademik: '2025/2026',
-    nominal: 3500000,
-    golongan: 'Tingkat 3',
-    jatuhTempo: '28 Feb 2026',
-    status: 'Belum Bayar'
-  };
+  // --- STATE UNTUK DATA & LOADING ---
+  const [bills, setBills] = useState([]);
+  const [paymentHistory, setPaymentHistory] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const riwayatPembayaran = [
-    {
-      id: 1,
-      semester: 'Ganjil 2025/2026',
-      tahun: '2025/2026',
-      nominal: 3500000,
-      status: 'Lunas'
-    },
-    {
-      id: 2,
-      semester: 'Genap 2024/2025',
-      tahun: '2024/2025',
-      nominal: 3500000,
-      status: 'Lunas'
+  // --- FETCH DATA ---
+  const fetchData = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const [billsResponse, historyResponse] = await Promise.all([
+        fetchStudentTuitionBills(),
+        fetchStudentPaymentHistory()
+      ]);
+      setBills(billsResponse?.bills ?? []);
+      setPaymentHistory(historyResponse?.items ?? []);
+    } catch (err) {
+      setError(err?.message ?? 'Gagal memuat data UKT');
+      console.error('Error fetching UKT data:', err);
+    } finally {
+      setIsLoading(false);
     }
-  ];
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // --- DERIVED DATA ---
+  const tagihanAktif = useMemo(() => {
+    const unpaidBill = bills.find(b => b.status === 'unpaid');
+    if (!unpaidBill) {
+      return {
+        semester: 'Tidak ada tagihan',
+        tahunAkademik: '-',
+        nominal: 0,
+        golongan: '-',
+        jatuhTempo: '-',
+        status: 'Lunas',
+        id: null
+      };
+    }
+    return {
+      id: unpaidBill.id,
+      semester: unpaidBill.academic_period?.name ?? 'Unknown',
+      tahunAkademik: unpaidBill.academic_period?.name?.match(/\d{4}\/\d{4}/) ?? '-',
+      nominal: unpaidBill.final_amount,
+      golongan: unpaidBill.tuition_rate?.group_name ?? 'Unknown',
+      jatuhTempo: unpaidBill.due_date ? new Date(unpaidBill.due_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-',
+      status: unpaidBill.status_label ?? 'Belum Bayar'
+    };
+  }, [bills]);
+
+  const riwayatPembayaran = useMemo(() => {
+    return paymentHistory.map(item => ({
+      id: item.id,
+      semester: item.academic_period ?? '-',
+      tahun: item.academic_period?.match(/\d{4}\/\d{4}/) ?? '-',
+      nominal: item.amount_paid,
+      status: item.verification_label ?? 'Disetujui'
+    }));
+  }, [paymentHistory]);
 
   const alurPembayaran = [
     { id: 1, title: 'Pilih Tagihan', desc: 'Pilih tagihan UKT', isActive: true },
@@ -155,10 +193,19 @@ return (
                   </div>
 
                   {/* Tombol Lanjut ke Checkout */}
-                  {/* Sesuaikan href dengan rute halaman checkout Anda selanjutnya */}
                   <Link 
-                    href="/mahasiswa/ukt/checkout" 
-                    className="w-full flex items-center justify-center gap-2 bg-[#015023] hover:bg-[#013d1b] text-white font-bold py-3.5 rounded-xl transition-colors shadow-sm"
+                    href={tagihanAktif.id ? `/ukt/checkout?bill=${tagihanAktif.id}` : '#'} 
+                    className={`w-full flex items-center justify-center gap-2 text-white font-bold py-3.5 rounded-xl transition-colors shadow-sm ${
+                      tagihanAktif.id 
+                        ? 'bg-[#015023] hover:bg-[#013d1b] cursor-pointer' 
+                        : 'bg-gray-400 cursor-not-allowed'
+                    }`}
+                    onClick={(e) => {
+                      if (!tagihanAktif.id) {
+                        e.preventDefault();
+                        toast.info('Tidak ada tagihan yang perlu dibayar');
+                      }
+                    }}
                   >
                     Lanjut ke Checkout
                     <ArrowRight className="w-5 h-5" />
@@ -167,8 +214,32 @@ return (
               </div>
             </div>
 
+            {/* Loading & Error States */}
+            {isLoading && (
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 flex flex-col items-center justify-center min-h-[300px]">
+                <Loader2 className="w-8 h-8 animate-spin text-[#015023] mb-3" />
+                <p className="text-sm text-gray-500 font-medium">Memuat riwayat pembayaran...</p>
+              </div>
+            )}
+
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-2xl p-6 flex items-start gap-3 mb-6">
+                <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm font-bold text-red-700">Gagal memuat data</p>
+                  <p className="text-sm text-red-600 mt-1">{error}</p>
+                  <button
+                    onClick={fetchData}
+                    className="mt-2 inline-flex items-center gap-2 text-sm font-bold text-red-600 hover:text-red-700 bg-white px-3 py-1.5 rounded-lg border border-red-200 hover:border-red-300"
+                  >
+                    <RefreshCw className="w-4 h-4" /> Coba Lagi
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* 2. Riwayat Pembayaran Section dengan BULK DOWNLOAD */}
-            <div>
+            {!isLoading && !error && <div>
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
                 <h2 className="text-xl font-bold text-[#015023]">Riwayat Pembayaran</h2>
                 
@@ -257,6 +328,7 @@ return (
                 </div>
               </div>
             </div>
+            }
 
           </div>
 
