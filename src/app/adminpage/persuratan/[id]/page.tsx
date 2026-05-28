@@ -144,7 +144,7 @@ export default function AdminDetailSuratPage({
                             >
                                 <p className="text-sm text-red-600">{error}</p>
                                 <button
-                                    onClick={refetch}
+                                    onClick={() => refetch()}
                                     className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white rounded-lg transition-colors hover:opacity-90 cursor-pointer"
                                     style={{ backgroundColor: '#015023' }}
                                 >
