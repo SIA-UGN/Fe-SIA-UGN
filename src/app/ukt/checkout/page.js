@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic';
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { 
   Home, ChevronRight, ArrowLeft, Check, 
   ChevronDown, Rocket, Loader2, AlertCircle, RefreshCw
@@ -78,13 +78,12 @@ const CustomBankSelect = ({ value, onChange, options }) => {
 
 export default function UktCheckoutPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const billId = Number(searchParams.get('bill')) || null;
 
   const [selectedBank, setSelectedBank] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [billData, setBillData] = useState(null);
-  const [isLoadingBill, setIsLoadingBill] = useState(!!billId);
+  const [isLoadingBill, setIsLoadingBill] = useState(false);
+  const [billId, setBillId] = useState(null);
   const [error, setError] = useState(null);
 
   // --- FETCH BILL DETAILS ---
@@ -111,6 +110,17 @@ export default function UktCheckoutPage() {
       fetchBillDetails();
     }
   }, [billId, fetchBillDetails]);
+
+  // Read URLSearchParams client-side to avoid prerender/useSearchParams SSR bailout
+  useEffect(() => {
+    try {
+      const sp = new URLSearchParams(window.location.search);
+      const bid = Number(sp.get('bill')) || null;
+      if (bid) setBillId(bid);
+    } catch (err) {
+      // ignore when window not available or parsing fails
+    }
+  }, []);
 
   // --- DERIVED DATA FROM BILL ---
   const ringkasan = billData ? {
