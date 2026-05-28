@@ -50,3 +50,4 @@ export function useRiwayatTA() {
   }, [thesis?.id_student_thesis]);
 
   return { thesis, isLoading, isDeleting, error, refetch: fetchData, deleteSubmission };
+}
