@@ -262,17 +262,12 @@ export async function submitStudentPayment(
   },
 ) {
   try {
+    // Build FormData from provided payload (client) before sending
     const formData = new FormData();
-    formData.append('payment_proof', payload.payment_proof);
-    formData.append('payment_method', payload.payment_method);
-
-    if (payload.transaction_reference) {
-      formData.append('transaction_reference', payload.transaction_reference);
-    }
-
-    if (payload.amount_paid !== undefined) {
-      formData.append('amount_paid', String(payload.amount_paid));
-    }
+    if (payload.payment_proof) formData.append('payment_proof', payload.payment_proof as File);
+    if (payload.payment_method) formData.append('payment_method', payload.payment_method);
+    if (payload.transaction_reference) formData.append('transaction_reference', payload.transaction_reference);
+    if (payload.amount_paid !== undefined) formData.append('amount_paid', String(payload.amount_paid));
 
     const response = await api.post(`/student/tuition/${tuitionFeeId}/pay`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
@@ -290,8 +285,9 @@ export async function submitStudentPayment(
       };
     }
 
-    const payload = response.data?.data ?? response.data;
-    const paymentParsed = StudentPaymentSchema.safeParse(payload);
+    // Fallback: try to parse server-returned payload as StudentPayment
+    const serverPayload = response.data?.data ?? response.data;
+    const paymentParsed = StudentPaymentSchema.safeParse(serverPayload);
 
     if (paymentParsed.success) {
       return {
@@ -301,7 +297,7 @@ export async function submitStudentPayment(
     }
 
     return {
-      payment: payload,
+      payment: serverPayload,
       message: response.data?.message || 'Bukti pembayaran berhasil diupload.',
     };
   } catch (error) {

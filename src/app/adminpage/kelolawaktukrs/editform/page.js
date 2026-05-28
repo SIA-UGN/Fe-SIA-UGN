@@ -17,6 +17,8 @@ import { Button } from '@/components/ui/button';
 import { ErrorMessageBox, SuccessMessageBoxWithButton } from '@/components/ui/message-box';
 import { AlertConfirmationRedDialog } from '@/components/ui/alert-dialog';
 
+export const dynamic = 'force-dynamic';
+
 // TODO: replace with real API
 async function fetchKrsSessionById(id) {
   const mock = {

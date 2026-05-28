@@ -36,7 +36,8 @@ const getFilterLabel = (filter) => {
 
 function NotifikasiPage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
+   export const dynamic = 'force-dynamic';
+   const searchParams = useSearchParams()
   
   // State management
   const [filter, setFilter] = useState('all')

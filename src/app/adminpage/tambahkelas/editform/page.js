@@ -26,6 +26,8 @@ import {
   updateClass,
 } from "@/lib/adminApi";
 
+export const dynamic = 'force-dynamic';
+
 const initialFormData = {
   code_class: "",
   id_subject: "",

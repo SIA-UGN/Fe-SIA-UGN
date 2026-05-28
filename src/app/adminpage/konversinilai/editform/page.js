@@ -18,6 +18,8 @@ import { AlertConfirmationRedDialog } from '@/components/ui/alert-dialog';
 import { rule } from 'postcss/lib/postcss';
 import { getGradeConversionById, updateGradeConversion } from '@/lib/gradeConv';
 
+export const dynamic = 'force-dynamic';
+
 function EditKonversiNilaiForm() {
 const router = useRouter();
 const searchParams = useSearchParams();

@@ -17,6 +17,8 @@ import LoadingEffect from "@/components/ui/loading-effect";
 import { ErrorMessageBox, SuccessMessageBoxWithButton, ErrorMessageBoxWithButton } from "@/components/ui/message-box";
 import { AlertConfirmationRedDialog } from "@/components/ui/alert-dialog";
 
+export const dynamic = 'force-dynamic';
+
 function EditMatkulForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
