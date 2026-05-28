@@ -147,7 +147,9 @@ export const logout = async () => {
 	}
 };
 
-export default {
+const SessionApi = {
 	login,
 	logout,
 };
+
+export default SessionApi;

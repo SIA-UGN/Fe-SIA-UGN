@@ -185,16 +185,18 @@ export const deleteProfileImage = async () => {
   }
 };
 
-export default {
-    getProfile,
-    getStaffProfile,
-    updateStaffProfile,
-    getStudentProfile,
-    updateStudentProfile,
-    getStudentAddress,
-    updateStudentAddress,
-    getStudentFamilyEducation,
-    updateStudentFamilyEducation,
-    changePassword,
-    deleteProfileImage,
+const ProfileApi = {
+  getProfile,
+  getStaffProfile,
+  updateStaffProfile,
+  getStudentProfile,
+  updateStudentProfile,
+  getStudentAddress,
+  updateStudentAddress,
+  getStudentFamilyEducation,
+  updateStudentFamilyEducation,
+  changePassword,
+  deleteProfileImage,
 };
+
+export default ProfileApi;

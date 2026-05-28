@@ -109,7 +109,7 @@ export const markMessagesAsRead = async (conversationId, messageIds) => {
     }
 };
 
-export default {
+const ChatApi = {
     getConversations,
     findOrCreatePrivateConversation,
     getMessages,
@@ -118,3 +118,5 @@ export default {
     getConversationDetail,
     markMessagesAsRead,
 };
+
+export default ChatApi;

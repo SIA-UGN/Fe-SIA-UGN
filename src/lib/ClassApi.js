@@ -87,9 +87,11 @@ export const getClassDetail = async (classId, role = 'dosen') => {
     }
 };
 
-export default {
+const ClassApi = {
     getAllClasses,
     getTeachingClasses,
     getStudentClasses,
     getClassDetail,
 };
+
+export default ClassApi;

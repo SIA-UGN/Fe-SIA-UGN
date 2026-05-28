@@ -246,7 +246,7 @@ export const respondAdminLibrarySuggestion = async (suggestionId, payload) => {
   }
 };
 
-export default {
+const LibraryApi = {
   getLibraryBooks,
   getLibraryBookById,
   getLibraryCategories,
@@ -274,3 +274,5 @@ export default {
   getAdminLibrarySuggestionById,
   respondAdminLibrarySuggestion,
 };
+
+export default LibraryApi;

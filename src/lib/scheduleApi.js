@@ -65,10 +65,12 @@ export function formatDate(date) {
     return date.toLocaleDateString('id-ID', options);
 }
 
-export default {
+const ScheduleApi = {
     getMySchedules,
     getMyClasses,
     formatTime,
     getDayName,
     formatDate,
 };
+
+export default ScheduleApi;
