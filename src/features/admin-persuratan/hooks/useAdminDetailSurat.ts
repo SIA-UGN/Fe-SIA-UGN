@@ -15,7 +15,7 @@ export function useAdminDetailSurat(id: number | null) {
 
     const error = useMemo(() => {
         return (
-            detailQuery.error?.userMessage ||
+            (detailQuery.error as any)?.userMessage ||
             detailQuery.error?.message ||
             null
         );
