@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { correspondenceService } from '@/types/correspondence';
+import type { CorrespondencePayload } from '@/types/correspondence.d';
 
 export const CORRESPONDENCE_QUERY_KEYS = {
   list: (params: Record<string, any> = {}) => ['correspondence', params],
@@ -44,7 +45,7 @@ export function useCreateCorrespondenceMutation() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (payload) => correspondenceService.create(payload),
+    mutationFn: (payload: CorrespondencePayload) => correspondenceService.create(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['correspondence'] });
     },
