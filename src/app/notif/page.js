@@ -34,10 +34,11 @@ const getFilterLabel = (filter) => {
   return 'notifikasi'
 }
 
+export const dynamic = 'force-dynamic';
+
 function NotifikasiPage() {
   const router = useRouter()
-   export const dynamic = 'force-dynamic';
-   const searchParams = useSearchParams()
+  const searchParams = useSearchParams()
   
   // State management
   const [filter, setFilter] = useState('all')
