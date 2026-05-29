@@ -1,0 +1,1544 @@
+# API KRS Mahasiswa — Admin & Manager Panel Documentation
+
+## Overview
+
+- **Base URL**     : Ikuti `NEXT_PUBLIC_API_BASE_URL` di `.env` (contoh: `http://localhost/api`)
+- **Auth Type**    : Laravel Sanctum — Bearer Token
+- **Content-Type** : `application/json`
+- **Token Expiry** : tidak ada expiry eksplisit (Sanctum personal access token)
+- **Versi API**    : tidak ada versioning prefix (langsung `/api/...`)
+- **Role Required**: `admin` ATAU `manager` (keduanya bisa akses semua endpoint di dokumen ini kecuali yang ditandai khusus)
+
+---
+
+## Authentication
+
+### Header wajib di setiap request yang butuh auth
+
+```
+Authorization: Bearer <token>
+Accept: application/json
+```
+
+### Cara mendapatkan token
+
+**Endpoint** : `POST /api/auth/login`
+
+**Body**:
+```json
+{ "username": "string", "password": "string" }
+```
+
+**Response sukses (200)**:
+```json
+{
+  "status": "success",
+  "data": {
+    "access_token": "string",
+    "user": {
+      "id": 5,
+      "name": "Manager User",
+      "roles": "manager"
+    }
+  }
+}
+```
+
+> **Catatan implementasi FE**: Token disimpan di cookie `token`, role di cookie `roles`, user_id di cookie `user_id`.
+> Middleware Laravel memeriksa `role:admin|manager` — pastikan role sudah benar saat login.
+
+---
+
+## Ringkasan Endpoint (Total: 37)
+
+| #  | Method | Endpoint                                              | Role         | Grup         |
+|----|--------|-------------------------------------------------------|--------------|--------------|
+| A1 | GET    | /api/manager/krs/students                             | admin/manager| Review KRS   |
+| A2 | GET    | /api/manager/krs                                      | admin/manager| Review KRS   |
+| A3 | GET    | /api/manager/krs/students/{studentId}                 | admin/manager| Review KRS   |
+| A4 | PATCH  | /api/manager/krs/{id}/approve                         | admin/manager| Review KRS   |
+| A5 | PATCH  | /api/manager/krs/{id}/reject                          | admin/manager| Review KRS   |
+| B1 | GET    | /api/manager/krs-sessions                             | admin/manager| Sesi KRS     |
+| B2 | POST   | /api/manager/krs-sessions                             | admin/manager| Sesi KRS     |
+| B3 | GET    | /api/manager/krs-sessions/{id}                        | admin/manager| Sesi KRS     |
+| B4 | PATCH  | /api/manager/krs-sessions/{id}/close                  | admin/manager| Sesi KRS     |
+| B5 | GET    | /api/manager/krs-sessions/{id}/classes                | admin/manager| Sesi KRS     |
+| B6 | POST   | /api/manager/krs-sessions/{id}/classes                | admin/manager| Sesi KRS     |
+| B7 | DELETE | /api/manager/krs-sessions/{id}/classes/{class_id}     | admin/manager| Sesi KRS     |
+| C1 | GET    | /api/manager/krs-quotas                               | admin/manager| Kuota SKS    |
+| C2 | POST   | /api/manager/krs-quotas                               | admin/manager| Kuota SKS    |
+| C3 | GET    | /api/manager/krs-quotas/{id}                          | admin/manager| Kuota SKS    |
+| C4 | PATCH  | /api/manager/krs-quotas/{id}                          | admin/manager| Kuota SKS    |
+| C5 | DELETE | /api/manager/krs-quotas/{id}                          | admin/manager| Kuota SKS    |
+| D1 | GET    | /api/manager/subjects                                 | admin/manager| Mata Kuliah  |
+| D2 | POST   | /api/manager/subjects                                 | admin/manager| Mata Kuliah  |
+| D3 | GET    | /api/manager/subjects/{id}                            | admin/manager| Mata Kuliah  |
+| D4 | PUT    | /api/manager/subjects/{id}                            | admin/manager| Mata Kuliah  |
+| D5 | DELETE | /api/manager/subjects/{id}                            | admin/manager| Mata Kuliah  |
+| E1 | GET    | /api/manager/classes                                  | admin/manager| Manajemen Kelas|
+| E2 | POST   | /api/manager/classes                                  | admin/manager| Manajemen Kelas|
+| E3 | GET    | /api/manager/classes/{id}                             | admin/manager| Manajemen Kelas|
+| E4 | PUT    | /api/manager/classes/{id}                             | admin/manager| Manajemen Kelas|
+| E5 | PATCH  | /api/manager/classes/{id}/toggle-status               | admin/manager| Manajemen Kelas|
+| E6 | POST   | /api/manager/classes/{id}/lecturers                   | admin/manager| Manajemen Kelas|
+| E7 | POST   | /api/manager/classes/{id}/students                    | admin/manager| Manajemen Kelas|
+| E8 | DELETE | /api/manager/classes/{id}/lecturers/{lecturerId}      | admin/manager| Manajemen Kelas|
+| E9 | DELETE | /api/manager/classes/{id}/students/{studentId}        | admin/manager| Manajemen Kelas|
+| F1 | GET    | /api/academic-periods                                 | semua user   | Periode Akademik|
+| F2 | GET    | /api/academic-periods/{id}                            | semua user   | Periode Akademik|
+| F3 | POST   | /api/academic-periods                                 | admin/manager| Periode Akademik|
+| F4 | PUT    | /api/academic-periods/{id}                            | admin/manager| Periode Akademik|
+| F5 | PUT    | /api/academic-periods/{id}/toggle-status              | admin/manager| Periode Akademik|
+| F6 | DELETE | /api/academic-periods/{id}                            | admin/manager| Periode Akademik|
+
+---
+
+## A. Monitoring & Persetujuan KRS
+
+Middleware: `auth:sanctum` + `role:admin|manager`
+Base prefix: `/api/manager/krs`
+
+---
+
+### A1. GET /api/manager/krs/students
+**Deskripsi**: Daftar mahasiswa yang mengajukan KRS, dikelompokkan per mahasiswa dengan ringkasan status.
+Digunakan untuk **list utama halaman approvalKRS**.
+
+**Query Params**:
+| Param               | Type    | Required | Keterangan                                           |
+|---------------------|---------|----------|------------------------------------------------------|
+| id_academic_period  | integer | optional | Filter per periode akademik (default: periode aktif) |
+| id_krs_session      | integer | optional | Filter per sesi KRS                                  |
+| action_needed       | boolean | optional | `true` → hanya mahasiswa yang punya pending KRS      |
+| search              | string  | optional | Cari nama atau username mahasiswa                    |
+| per_page            | integer | optional | Default: 20                                          |
+| page                | integer | optional | Default: 1                                           |
+
+**Response Sukses (200)**:
+```json
+{
+  "status": "success",
+  "message": "Daftar mahasiswa KRS berhasil diambil.",
+  "data": {
+    "current_page": 1,
+    "data": [
+      {
+        "student": {
+          "id_user_si": 100,
+          "name": "Wachyoudi",
+          "username": "wachyoudi123"
+        },
+        "total_krs": 6,
+        "pending_count": 3,
+        "approved_count": 2,
+        "rejected_count": 1,
+        "action_needed": true
+      }
+    ],
+    "total": 28,
+    "per_page": 20,
+    "last_page": 2
+  }
+}
+```
+
+**Response Error (404)**:
+```json
+{ "status": "error", "message": "Tidak ada periode akademik yang aktif." }
+```
+
+> ⚠️ **Catatan FE**: Response ini TIDAK mengandung `nim`, `prodi`, `semester`, `ipk`.
+> Field-field tersebut hanya ada di profil mahasiswa (`GET /api/student/profile`).
+> Untuk menampilkan data seperti di dummy (nama, nim, prodi, semester), perlu call tambahan
+> atau backend perlu ditambah join dengan tabel profil mahasiswa.
+
+---
+
+### A2. GET /api/manager/krs
+**Deskripsi**: Daftar SEMUA pengajuan KRS dari seluruh mahasiswa (level entry, bukan summary).
+Berguna untuk filter per mata kuliah atau per sesi secara granular.
+
+**Query Params**:
+| Param               | Type    | Required | Keterangan                                  |
+|---------------------|---------|----------|---------------------------------------------|
+| status              | string  | optional | `pending`, `approved`, atau `rejected`      |
+| id_krs_session      | integer | optional | Filter per sesi KRS                         |
+| id_academic_period  | integer | optional | Filter per periode akademik                 |
+| id_subject          | integer | optional | Filter per mata kuliah                      |
+| search              | string  | optional | Cari nama atau username mahasiswa            |
+| per_page            | integer | optional | Default: 15                                 |
+| page                | integer | optional | Default: 1                                  |
+
+**Response Sukses (200)**:
+```json
+{
+  "status": "success",
+  "message": "Daftar pengajuan KRS berhasil diambil.",
+  "data": {
+    "current_page": 1,
+    "data": [
+      {
+        "id_krs": 1,
+        "id_krs_session": 1,
+        "id_user_si": 100,
+        "id_academic_period": 1,
+        "id_class": 10,
+        "id_subject": 1,
+        "status": "pending",
+        "rejection_reason": null,
+        "processed_by": null,
+        "processed_at": null,
+        "created_at": "2026-05-15T10:30:00.000000Z",
+        "updated_at": "2026-05-15T10:30:00.000000Z",
+        "student": { "id_user_si": 100, "name": "Wachyoudi", "username": "wachyoudi123" },
+        "academicPeriod": { "id_academic_period": 1, "name": "Semester Ganjil 2024/2025" },
+        "krsClass": {
+          "id_class": 10,
+          "code_class": "A",
+          "id_subject": 1,
+          "day_of_week": "Senin",
+          "start_time": "08:00:00",
+          "end_time": "10:30:00",
+          "subject": { "id_subject": 1, "name_subject": "Basis Data", "code_subject": "SVPL1234", "sks": 2 },
+          "lecturers": [{ "id_user_si": 20, "name": "Dr. William, M.Kom" }]
+        },
+        "krsSession": { "id_krs_session": 1, "status": "open", "opened_at": "2026-05-01T09:00:00.000000Z", "closed_at": null },
+        "processor": null
+      }
+    ],
+    "last_page": 8,
+    "per_page": 15,
+    "total": 120
+  }
+}
+```
+
+---
+
+### A3. GET /api/manager/krs/students/{studentId}
+**Deskripsi**: Detail LENGKAP seluruh pengajuan KRS satu mahasiswa.
+Digunakan untuk **halaman detail/review KRS** (`/adminpage/approvalKRS/{id}`).
+
+**Path Params**:
+| Param     | Type    | Required | Keterangan        |
+|-----------|---------|----------|-------------------|
+| studentId | integer | required | User ID mahasiswa |
+
+**Query Params**:
+| Param               | Type    | Required | Keterangan                                           |
+|---------------------|---------|----------|------------------------------------------------------|
+| id_academic_period  | integer | optional | Filter per periode (default: periode aktif)          |
+
+**Response Sukses (200)**:
+```json
+{
+  "status": "success",
+  "message": "Data KRS mahasiswa berhasil diambil.",
+  "data": {
+    "student": { "id_user_si": 100, "name": "Wachyoudi", "username": "wachyoudi123" },
+    "quota": { "max_sks": 24, "notes": "Mahasiswa reguler" },
+    "summary": {
+      "pending":  { "count": 3, "total_sks": 8 },
+      "approved": { "count": 2, "total_sks": 5 },
+      "rejected": { "count": 1, "total_sks": 3 }
+    },
+    "sks_used": 16,
+    "sks_approved": 5,
+    "krs": [
+      {
+        "id_krs": 1,
+        "id_krs_session": 1,
+        "id_user_si": 100,
+        "id_academic_period": 1,
+        "id_class": 10,
+        "id_subject": 1,
+        "status": "pending",
+        "rejection_reason": null,
+        "processed_by": null,
+        "processed_at": null,
+        "created_at": "2026-05-15T10:30:00.000000Z",
+        "subject": { "id_subject": 1, "name_subject": "Basis Data", "code_subject": "SVPL1234", "sks": 2 },
+        "krsClass": {
+          "id_class": 10,
+          "code_class": "A",
+          "day_of_week": "Senin",
+          "start_time": "08:00:00",
+          "end_time": "10:30:00",
+          "subject": { "id_subject": 1, "name_subject": "Basis Data", "code_subject": "SVPL1234", "sks": 2 },
+          "lecturers": [{ "id_user_si": 20, "name": "Dr. William, M.Kom" }]
+        },
+        "krsSession": { "id_krs_session": 1, "status": "open" },
+        "academicPeriod": { "id_academic_period": 1, "name": "Semester Ganjil 2024/2025" },
+        "processor": null
+      }
+    ]
+  }
+}
+```
+
+**Response Error (404)**:
+```json
+{ "status": "error", "message": "Tidak ada periode akademik yang aktif." }
+```
+
+> ⚠️ **Catatan FE**: Response ini TIDAK mengandung `nim`, `prodi`, `semester`, `ipk`.
+> Tampilan detail halaman `[id]/page.js` menampilkan data tersebut dari dummy — perlu
+> call tambahan ke profil mahasiswa atau backend perlu extend response.
+
+---
+
+### A4. PATCH /api/manager/krs/{id}/approve
+**Deskripsi**: Setujui pengajuan KRS (hanya status `pending`).
+
+**Path Params**:
+| Param | Type    | Required | Keterangan |
+|-------|---------|----------|------------|
+| id    | integer | required | KRS ID     |
+
+**Request Body**: kosong / tidak diperlukan
+
+**Response Sukses (200)**:
+```json
+{
+  "status": "success",
+  "message": "KRS mahasiswa berhasil disetujui.",
+  "data": {
+    "id_krs": 1,
+    "id_krs_session": 1,
+    "id_user_si": 100,
+    "id_academic_period": 1,
+    "id_class": 10,
+    "id_subject": 1,
+    "status": "approved",
+    "processed_by": 5,
+    "processed_at": "2026-05-16T14:00:00.000000Z",
+    "rejection_reason": null,
+    "student": { "id_user_si": 100, "name": "Wachyoudi", "username": "wachyoudi123" },
+    "subject": { "id_subject": 1, "name_subject": "Basis Data", "code_subject": "SVPL1234", "sks": 2 },
+    "krsClass": { "id_class": 10, "code_class": "A" },
+    "academicPeriod": { "id_academic_period": 1, "name": "Semester Ganjil 2024/2025" },
+    "processor": { "id_user_si": 5, "name": "Current Manager" }
+  }
+}
+```
+
+**Response Error (422)**:
+```json
+{
+  "status": "error",
+  "message": "Hanya pengajuan KRS yang berstatus pending yang dapat disetujui."
+}
+```
+```json
+{
+  "status": "error",
+  "message": "Mahasiswa ini belum memiliki kuota KRS yang ditetapkan. Tetapkan kuota terlebih dahulu."
+}
+```
+```json
+{
+  "status": "error",
+  "message": "Persetujuan ini akan melebihi kuota SKS mahasiswa. Kuota: 24 SKS | Sudah disetujui: 22 SKS | SKS mata kuliah ini: 3 SKS."
+}
+```
+
+> **Catatan**: Endpoint ini TIDAK menerima field `catatan` / notes dari approver.
+> Field tersebut hanya ada di dummy FE — backend tidak menyimpannya.
+> Jika dibutuhkan, perlu konfirmasi tim BE untuk penambahan field.
+
+---
+
+### A5. PATCH /api/manager/krs/{id}/reject
+**Deskripsi**: Tolak pengajuan KRS dengan alasan (hanya status `pending`).
+
+**Path Params**:
+| Param | Type    | Required | Keterangan |
+|-------|---------|----------|------------|
+| id    | integer | required | KRS ID     |
+
+**Request Body**:
+```json
+{ "rejection_reason": "Kelas sudah penuh. Silakan pilih kelas lain dengan subject yang sama." }
+```
+
+| Field            | Type   | Required | Keterangan                          |
+|------------------|--------|----------|-------------------------------------|
+| rejection_reason | string | required | Alasan penolakan, minimal 10 karakter, maksimal 500 karakter |
+
+**Response Sukses (200)**:
+```json
+{
+  "status": "success",
+  "message": "KRS mahasiswa berhasil ditolak.",
+  "data": {
+    "id_krs": 1,
+    "status": "rejected",
+    "processed_by": 5,
+    "processed_at": "2026-05-16T15:30:00.000000Z",
+    "rejection_reason": "Kelas sudah penuh. Silakan pilih kelas lain dengan subject yang sama.",
+    "student": { "id_user_si": 100, "name": "Wachyoudi", "username": "wachyoudi123" },
+    "subject": { "id_subject": 1, "name_subject": "Basis Data", "code_subject": "SVPL1234", "sks": 2 },
+    "krsClass": { "id_class": 10, "code_class": "A" },
+    "academicPeriod": { "id_academic_period": 1, "name": "Semester Ganjil 2024/2025" },
+    "processor": { "id_user_si": 5, "name": "Current Manager" }
+  }
+}
+```
+
+**Response Error (422)**:
+```json
+{ "status": "error", "message": "Hanya pengajuan KRS yang berstatus pending yang dapat ditolak." }
+```
+```json
+{
+  "status": "error",
+  "message": null,
+  "errors": {
+    "rejection_reason": ["Alasan penolakan wajib diisi.", "Alasan penolakan minimal 10 karakter."]
+  }
+}
+```
+
+---
+
+## B. Manajemen Sesi KRS
+
+Middleware: `auth:sanctum` + `role:admin|manager`
+Base prefix: `/api/manager/krs-sessions`
+
+---
+
+### B1. GET /api/manager/krs-sessions
+**Deskripsi**: Daftar semua sesi KRS dengan filter dan pagination.
+
+**Query Params**:
+| Param               | Type    | Required | Keterangan                  |
+|---------------------|---------|----------|-----------------------------|
+| status              | string  | optional | `open` atau `closed`        |
+| id_academic_period  | integer | optional | Filter per periode akademik |
+| per_page            | integer | optional | Default: 15                 |
+| page                | integer | optional | Default: 1                  |
+
+**Response Sukses (200)**:
+```json
+{
+  "status": "success",
+  "message": "Daftar sesi KRS berhasil diambil.",
+  "data": {
+    "current_page": 1,
+    "data": [
+      {
+        "id_krs_session": 1,
+        "id_academic_period": 1,
+        "status": "open",
+        "notes": "Pembatasan SKS maksimal 24",
+        "opened_at": "2026-05-01T09:00:00.000000Z",
+        "closed_at": null,
+        "opened_by": 5,
+        "closed_by": null,
+        "academic_period": { "id_academic_period": 1, "name": "Semester Ganjil 2024/2025", "is_active": true },
+        "opener": { "id_user_si": 5, "name": "Manager User" },
+        "closer": null,
+        "session_classes_count": 45
+      }
+    ],
+    "last_page": 1,
+    "per_page": 15,
+    "total": 1
+  }
+}
+```
+
+---
+
+### B2. POST /api/manager/krs-sessions
+**Deskripsi**: Buka sesi KRS baru (opsional: langsung tambahkan kelas).
+
+**Request Body**:
+```json
+{
+  "id_academic_period": 1,
+  "notes": "Pembatasan SKS maksimal 24",
+  "classes": [
+    { "id_class": 10 },
+    { "id_class": 11 }
+  ]
+}
+```
+
+| Field               | Type    | Required | Keterangan                                       |
+|---------------------|---------|----------|--------------------------------------------------|
+| id_academic_period  | integer | required | ID periode akademik (harus ada di DB)            |
+| notes               | string  | optional | Catatan sesi, maks 1000 karakter                 |
+| classes             | array   | optional | Array kelas yang langsung didaftarkan            |
+| classes[].id_class  | integer | required (jika ada) | ID kelas yang valid              |
+
+**Response Sukses (201)**:
+```json
+{
+  "status": "success",
+  "message": "Sesi KRS berhasil dibuka. 2 kelas telah didaftarkan ke sesi ini.",
+  "data": {
+    "id_krs_session": 1,
+    "id_academic_period": 1,
+    "status": "open",
+    "notes": "Pembatasan SKS maksimal 24",
+    "opened_at": "2026-05-01T09:00:00.000000Z",
+    "closed_at": null,
+    "academic_period": { "id_academic_period": 1, "name": "Semester Ganjil 2024/2025" },
+    "opener": { "id_user_si": 5, "name": "Current Manager" },
+    "session_classes_count": 2
+  }
+}
+```
+
+**Response Error (422)**:
+```json
+{ "status": "error", "message": "Periode akademik tidak ditemukan." }
+```
+
+---
+
+### B3. GET /api/manager/krs-sessions/{id}
+**Deskripsi**: Detail sesi KRS beserta statistik jumlah pengajuan.
+
+**Path Params**:
+| Param | Type    | Required | Keterangan     |
+|-------|---------|----------|----------------|
+| id    | integer | required | KRS session ID |
+
+**Response Sukses (200)**:
+```json
+{
+  "status": "success",
+  "message": "Detail sesi KRS berhasil diambil.",
+  "data": {
+    "id_krs_session": 1,
+    "id_academic_period": 1,
+    "status": "open",
+    "notes": "Pembatasan SKS maksimal 24",
+    "opened_at": "2026-05-01T09:00:00.000000Z",
+    "closed_at": null,
+    "academic_period": { "id_academic_period": 1, "name": "Semester Ganjil 2024/2025", "is_active": true },
+    "opener": { "id_user_si": 5, "name": "Manager User" },
+    "closer": null,
+    "session_classes_count": 45,
+    "stats": {
+      "total_classes": 45,
+      "total": 120,
+      "pending": 85,
+      "approved": 30,
+      "rejected": 5
+    }
+  }
+}
+```
+
+---
+
+### B4. PATCH /api/manager/krs-sessions/{id}/close
+**Deskripsi**: Tutup sesi KRS. Mahasiswa tidak bisa mendaftar setelah sesi ditutup.
+
+**Path Params**:
+| Param | Type    | Required | Keterangan     |
+|-------|---------|----------|----------------|
+| id    | integer | required | KRS session ID |
+
+**Request Body**: kosong / tidak diperlukan
+
+**Response Sukses (200)**:
+```json
+{
+  "status": "success",
+  "message": "Sesi KRS berhasil ditutup.",
+  "data": {
+    "id_krs_session": 1,
+    "id_academic_period": 1,
+    "status": "closed",
+    "opened_at": "2026-05-01T09:00:00.000000Z",
+    "closed_at": "2026-05-30T17:00:00.000000Z",
+    "academic_period": { "id_academic_period": 1, "name": "Semester Ganjil 2024/2025" },
+    "opener": { "id_user_si": 5, "name": "Manager User" },
+    "closer": { "id_user_si": 5, "name": "Current Manager" },
+    "pending_krs_count": 45
+  }
+}
+```
+
+**Response Error (422)**:
+```json
+{ "status": "error", "message": "Sesi KRS ini sudah ditutup." }
+```
+
+---
+
+### B5. GET /api/manager/krs-sessions/{id}/classes
+**Deskripsi**: Daftar kelas yang terdaftar dalam sesi KRS tertentu (dengan pagination).
+
+**Path Params**:
+| Param | Type    | Required | Keterangan     |
+|-------|---------|----------|----------------|
+| id    | integer | required | KRS session ID |
+
+**Query Params**:
+| Param      | Type    | Required | Keterangan                  |
+|------------|---------|----------|-----------------------------|
+| id_subject | integer | optional | Filter per mata kuliah      |
+| search     | string  | optional | Cari nama/kode mata kuliah  |
+| per_page   | integer | optional | Default: 20                 |
+| page       | integer | optional | Default: 1                  |
+
+**Response Sukses (200)**:
+```json
+{
+  "status": "success",
+  "message": "Daftar kelas sesi KRS berhasil diambil.",
+  "data": {
+    "session": {
+      "id_krs_session": 1,
+      "status": "open",
+      "id_academic_period": 1
+    },
+    "classes": {
+      "current_page": 1,
+      "data": [
+        {
+          "id_krs_session_class": 1,
+          "id_krs_session": 1,
+          "id_subject": 1,
+          "id_class": 10,
+          "subject": { "id_subject": 1, "name_subject": "Basis Data", "code_subject": "SVPL1234", "sks": 2 },
+          "krsClass": {
+            "id_class": 10,
+            "code_class": "A",
+            "day_of_week": "Senin",
+            "start_time": "08:00:00",
+            "end_time": "10:30:00",
+            "member_class": 30,
+            "lecturers": [{ "id_user_si": 20, "name": "Dr. William, M.Kom" }]
+          }
+        }
+      ],
+      "last_page": 3,
+      "per_page": 20,
+      "total": 45
+    }
+  }
+}
+```
+
+> **Catatan**: Key paginasi ada di dalam `data.classes`, bukan `data` langsung.
+
+---
+
+### B6. POST /api/manager/krs-sessions/{id}/classes
+**Deskripsi**: Tambah kelas ke dalam sesi KRS (batch).
+
+**Path Params**:
+| Param | Type    | Required | Keterangan     |
+|-------|---------|----------|----------------|
+| id    | integer | required | KRS session ID |
+
+**Request Body**:
+```json
+{
+  "classes": [
+    { "id_class": 10 },
+    { "id_class": 11 },
+    { "id_class": 12 }
+  ]
+}
+```
+
+| Field              | Type    | Required | Keterangan             |
+|--------------------|---------|----------|------------------------|
+| classes            | array   | required | Min 1 item             |
+| classes[].id_class | integer | required | ID kelas yang valid    |
+
+**Response Sukses — ada kelas baru (201)**:
+```json
+{
+  "status": "success",
+  "message": "3 kelas berhasil ditambahkan ke sesi KRS.",
+  "data": { "added": 3, "skipped": 0, "total_classes": 48 }
+}
+```
+
+**Response Sukses — semua sudah ada (200)**:
+```json
+{
+  "status": "success",
+  "message": "Semua kelas yang diberikan sudah terdaftar dalam sesi ini.",
+  "data": { "added": 0, "skipped": 3, "total_classes": 45 }
+}
+```
+
+---
+
+### B7. DELETE /api/manager/krs-sessions/{id}/classes/{class_id}
+**Deskripsi**: Hapus kelas dari sesi KRS.
+
+**Path Params**:
+| Param    | Type    | Required | Keterangan         |
+|----------|---------|----------|--------------------|
+| id       | integer | required | KRS session ID     |
+| class_id | integer | required | ID kelas yang dihapus |
+
+**Response Sukses (200)**:
+```json
+{ "status": "success", "message": "Kelas berhasil dihapus dari sesi KRS." }
+```
+
+**Response Error (422)**:
+```json
+{ "status": "error", "message": "Kelas tidak ditemukan dalam sesi KRS ini." }
+```
+
+---
+
+## C. Manajemen Kuota SKS Mahasiswa
+
+Middleware: `auth:sanctum` + `role:admin|manager`
+Base prefix: `/api/manager/krs-quotas`
+
+---
+
+### C1. GET /api/manager/krs-quotas
+**Deskripsi**: Daftar kuota KRS seluruh mahasiswa dengan pagination.
+
+**Query Params**:
+| Param               | Type    | Required | Keterangan                  |
+|---------------------|---------|----------|-----------------------------|
+| id_academic_period  | integer | optional | Filter per periode akademik |
+| search              | string  | optional | Cari nama/username mahasiswa|
+| per_page            | integer | optional | Default: 15                 |
+| page                | integer | optional | Default: 1                  |
+
+**Response Sukses (200)**:
+```json
+{
+  "status": "success",
+  "message": "Daftar kuota KRS berhasil diambil.",
+  "data": {
+    "current_page": 1,
+    "data": [
+      {
+        "id_krs_quota": 1,
+        "id_user_si": 100,
+        "id_academic_period": 1,
+        "max_sks": 24,
+        "notes": "Mahasiswa regular",
+        "set_by": 5,
+        "created_at": "2026-05-01T10:00:00.000000Z",
+        "updated_at": "2026-05-01T10:00:00.000000Z",
+        "student": { "id_user_si": 100, "name": "Wachyoudi", "username": "wachyoudi123" },
+        "academicPeriod": { "id_academic_period": 1, "name": "Semester Ganjil 2024/2025", "is_active": true },
+        "setter": { "id_user_si": 5, "name": "Manager User" }
+      }
+    ],
+    "last_page": 2,
+    "per_page": 15,
+    "total": 28
+  }
+}
+```
+
+---
+
+### C2. POST /api/manager/krs-quotas
+**Deskripsi**: Tetapkan atau perbarui kuota SKS mahasiswa (upsert per mahasiswa per periode).
+
+**Request Body**:
+```json
+{
+  "id_user_si": 100,
+  "id_academic_period": 1,
+  "max_sks": 24,
+  "notes": "Mahasiswa regular dengan IPK di atas 3.0"
+}
+```
+
+| Field               | Type    | Required | Keterangan                                       |
+|---------------------|---------|----------|--------------------------------------------------|
+| id_user_si          | integer | required | User ID mahasiswa (role harus `mahasiswa`)       |
+| id_academic_period  | integer | required | ID periode akademik yang valid                   |
+| max_sks             | integer | required | Maks SKS, nilai 1–60                             |
+| notes               | string  | optional | Catatan, maks 500 karakter                       |
+
+**Response Sukses — kuota baru (201)**:
+```json
+{
+  "status": "success",
+  "message": "Kuota KRS mahasiswa berhasil ditetapkan.",
+  "data": {
+    "id_krs_quota": 1,
+    "id_user_si": 100,
+    "id_academic_period": 1,
+    "max_sks": 24,
+    "notes": "Mahasiswa regular dengan IPK di atas 3.0",
+    "student": { "id_user_si": 100, "name": "Wachyoudi", "username": "wachyoudi123" },
+    "academicPeriod": { "id_academic_period": 1, "name": "Semester Ganjil 2024/2025" },
+    "setter": { "id_user_si": 5, "name": "Current Manager" }
+  }
+}
+```
+
+**Response Sukses — update (200)** (sama tapi `message`: `"...berhasil diperbarui."`)
+
+**Response Error (422)**:
+```json
+{ "status": "error", "message": "Kuota KRS hanya dapat ditetapkan untuk pengguna dengan role mahasiswa." }
+```
+
+---
+
+### C3. GET /api/manager/krs-quotas/{id}
+**Deskripsi**: Detail kuota KRS mahasiswa beserta kalkulasi SKS yang terpakai.
+
+**Path Params**:
+| Param | Type    | Required | Keterangan   |
+|-------|---------|----------|--------------|
+| id    | integer | required | KRS quota ID |
+
+**Response Sukses (200)**:
+```json
+{
+  "status": "success",
+  "message": "Detail kuota KRS berhasil diambil.",
+  "data": {
+    "id_krs_quota": 1,
+    "id_user_si": 100,
+    "id_academic_period": 1,
+    "max_sks": 24,
+    "notes": "Mahasiswa regular",
+    "student": { "id_user_si": 100, "name": "Wachyoudi", "username": "wachyoudi123" },
+    "academicPeriod": {
+      "id_academic_period": 1,
+      "name": "Semester Ganjil 2024/2025",
+      "start_date": "2024-09-01",
+      "end_date": "2025-01-31",
+      "is_active": true
+    },
+    "setter": { "id_user_si": 5, "name": "Manager User" },
+    "sks_used": 16,
+    "sks_approved": 10,
+    "sks_remaining": 8
+  }
+}
+```
+
+---
+
+### C4. PATCH /api/manager/krs-quotas/{id}
+**Deskripsi**: Update kuota SKS mahasiswa yang sudah ada.
+
+**Path Params**:
+| Param | Type    | Required | Keterangan   |
+|-------|---------|----------|--------------|
+| id    | integer | required | KRS quota ID |
+
+**Request Body**:
+```json
+{ "max_sks": 20, "notes": "Updated karena performa akademik" }
+```
+
+| Field   | Type    | Required | Keterangan                       |
+|---------|---------|----------|----------------------------------|
+| max_sks | integer | optional | Nilai baru maks SKS (1–60)       |
+| notes   | string  | optional | Catatan baru, maks 500 karakter  |
+
+**Response Sukses (200)**:
+```json
+{
+  "status": "success",
+  "message": "Kuota KRS berhasil diperbarui.",
+  "data": {
+    "id_krs_quota": 1,
+    "id_user_si": 100,
+    "id_academic_period": 1,
+    "max_sks": 20,
+    "notes": "Updated karena performa akademik",
+    "student": { "id_user_si": 100, "name": "Wachyoudi", "username": "wachyoudi123" },
+    "academicPeriod": { "id_academic_period": 1, "name": "Semester Ganjil 2024/2025" },
+    "setter": { "id_user_si": 5, "name": "Manager User" }
+  }
+}
+```
+
+---
+
+### C5. DELETE /api/manager/krs-quotas/{id}
+**Deskripsi**: Hapus kuota KRS mahasiswa.
+
+**Path Params**:
+| Param | Type    | Required | Keterangan   |
+|-------|---------|----------|--------------|
+| id    | integer | required | KRS quota ID |
+
+**Response Sukses (200)**:
+```json
+{ "status": "success", "message": "Kuota KRS berhasil dihapus." }
+```
+
+---
+
+## D. Manajemen Mata Kuliah
+
+Middleware: `auth:sanctum` + `role:admin|manager`
+Base prefix: `/api/manager/subjects`
+
+---
+
+### D1. GET /api/manager/subjects
+**Deskripsi**: Daftar semua mata kuliah (tanpa pagination).
+
+**Query Params**: —
+
+**Response Sukses (200)**:
+```json
+{
+  "status": "success",
+  "message": "Daftar mata kuliah berhasil diambil.",
+  "data": [
+    {
+      "id_subject": 1,
+      "name_subject": "Basis Data",
+      "code_subject": "SVPL1234",
+      "sks": 2
+    }
+  ]
+}
+```
+
+---
+
+### D2. POST /api/manager/subjects
+**Deskripsi**: Buat mata kuliah baru.
+
+**Request Body**:
+```json
+{ "name_subject": "Basis Data", "code_subject": "SVPL1234", "sks": 2 }
+```
+
+| Field        | Type    | Required | Keterangan                              |
+|--------------|---------|----------|-----------------------------------------|
+| name_subject | string  | required | Nama mata kuliah, maks 255 karakter     |
+| code_subject | string  | required | Kode unik, maks 10 karakter             |
+| sks          | integer | required | Jumlah SKS, min 1                       |
+
+**Response Sukses (201)**:
+```json
+{
+  "status": "success",
+  "message": "Mata kuliah berhasil dibuat.",
+  "data": { "id_subject": 1, "name_subject": "Basis Data", "code_subject": "SVPL1234", "sks": 2, "created_at": "...", "updated_at": "..." }
+}
+```
+
+**Response Error (422)** (duplikat kode):
+```json
+{ "message": "The code subject has already been taken.", "errors": { "code_subject": ["Kode mata kuliah sudah digunakan."] } }
+```
+
+---
+
+### D3. GET /api/manager/subjects/{id}
+**Deskripsi**: Detail mata kuliah.
+
+**Path Params**: `id` (integer, required)
+
+**Response Sukses (200)**:
+```json
+{
+  "status": "success",
+  "message": "Detail mata kuliah berhasil diambil.",
+  "data": { "id_subject": 1, "name_subject": "Basis Data", "code_subject": "SVPL1234", "sks": 2, "created_at": "...", "updated_at": "..." }
+}
+```
+
+---
+
+### D4. PUT /api/manager/subjects/{id}
+**Deskripsi**: Update mata kuliah.
+
+**Path Params**: `id` (integer, required)
+
+**Request Body**:
+```json
+{ "name_subject": "Basis Data Lanjut", "code_subject": "SVPL1234", "sks": 3 }
+```
+
+| Field        | Type    | Required | Keterangan                                          |
+|--------------|---------|----------|-----------------------------------------------------|
+| name_subject | string  | required | maks 255 karakter                                   |
+| code_subject | string  | required | maks 10 karakter, unik (boleh sama dengan milik sendiri) |
+| sks          | integer | required | min 1, maks 6                                       |
+
+**Response Sukses (200)**: sama struktur dengan D3.
+
+---
+
+### D5. DELETE /api/manager/subjects/{id}
+**Deskripsi**: Hapus mata kuliah. Gagal jika masih ada kelas atau nilai yang menggunakan matkul ini.
+
+**Path Params**: `id` (integer, required)
+
+**Response Sukses (200)**:
+```json
+{
+  "status": "success",
+  "message": "Mata kuliah berhasil dihapus.",
+  "data": { "id_subject": 1, "name_subject": "Basis Data", "code_subject": "SVPL1234", "deleted_at": "..." }
+}
+```
+
+**Response Error (409)** (masih dipakai kelas):
+```json
+{
+  "status": "failed",
+  "message": "Mata kuliah tidak dapat dihapus: Terdapat 3 kelas yang menggunakan mata kuliah ini.",
+  "error": "Terdapat 3 kelas yang menggunakan mata kuliah ini.",
+  "class_count": 3
+}
+```
+
+**Response Error (409)** (masih ada nilai mahasiswa):
+```json
+{
+  "status": "failed",
+  "message": "Mata kuliah tidak dapat dihapus: Terdapat 25 nilai mahasiswa untuk mata kuliah ini.",
+  "grade_count": 25
+}
+```
+
+---
+
+## E. Manajemen Kelas
+
+Middleware: `auth:sanctum` + `role:admin|manager`
+Base prefix: `/api/manager/classes`
+
+---
+
+### E1. GET /api/manager/classes
+**Deskripsi**: Daftar semua kelas beserta informasi mata kuliah, periode, dan jadwal.
+
+**Query Params**: —
+
+**Response Sukses (200)**:
+```json
+{
+  "status": "success",
+  "message": "Daftar kelas berhasil diambil.",
+  "data": [
+    {
+      "id_class": 10,
+      "name_subject": "Basis Data",
+      "code_subject": "SVPL1234",
+      "code_class": "A",
+      "member_class": 30,
+      "day_of_week": 1,
+      "start_time": "08:00:00",
+      "end_time": "10:30:00",
+      "id_academic_period": 1,
+      "academic_period_name": "Semester Ganjil 2024/2025",
+      "is_active": true,
+      "total_students": 25,
+      "schedule": "Senin, 08:00 - 10:30"
+    }
+  ]
+}
+```
+
+> **Catatan**: Response ini TIDAK mengandung data dosen. Untuk info dosen, panggil E3 (detail kelas).
+
+---
+
+### E2. POST /api/manager/classes
+**Deskripsi**: Buat kelas baru.
+
+**Request Body**:
+```json
+{
+  "id_subject": 1,
+  "id_academic_period": 1,
+  "code_class": "A",
+  "member_class": 30,
+  "day_of_week": 1,
+  "start_time": "08:00",
+  "end_time": "10:30",
+  "is_active": true
+}
+```
+
+| Field               | Type    | Required | Keterangan                               |
+|---------------------|---------|----------|------------------------------------------|
+| id_subject          | integer | required | ID mata kuliah yang valid                |
+| id_academic_period  | integer | required | ID periode akademik yang valid           |
+| code_class          | string  | required | Kode kelas, maks 10 karakter             |
+| member_class        | integer | required | Kapasitas mahasiswa, min 1               |
+| day_of_week         | integer | required | 1=Senin, 2=Selasa, ..., 7=Minggu         |
+| start_time          | string  | required | Format `HH:mm` (contoh: `08:00`)         |
+| end_time            | string  | required | Format `HH:mm`, harus setelah start_time |
+| is_active           | boolean | optional | Default: `true`                          |
+
+**Response Sukses (201)**:
+```json
+{
+  "status": "success",
+  "message": "Kelas baru berhasil dibuat.",
+  "data": {
+    "id_class": 10,
+    "id_subject": 1,
+    "id_academic_period": 1,
+    "code_class": "A",
+    "member_class": 30,
+    "day_of_week": 1,
+    "start_time": "08:00:00",
+    "end_time": "10:30:00",
+    "is_active": true,
+    "created_at": "...",
+    "updated_at": "..."
+  }
+}
+```
+
+---
+
+### E3. GET /api/manager/classes/{id}
+**Deskripsi**: Detail kelas lengkap beserta mata kuliah, periode, daftar dosen, mahasiswa, dan jadwal.
+
+**Path Params**: `id` (integer, required) — ini adalah `classId`
+
+**Response Sukses (200)**:
+```json
+{
+  "status": "success",
+  "message": "Detail kelas berhasil diambil.",
+  "data": {
+    "id_class": 10,
+    "id_subject": 1,
+    "id_academic_period": 1,
+    "code_class": "A",
+    "member_class": 30,
+    "day_of_week": 1,
+    "start_time": "08:00:00",
+    "end_time": "10:30:00",
+    "is_active": true,
+    "created_at": "...",
+    "updated_at": "...",
+    "subject": { "id_subject": 1, "name_subject": "Basis Data", "code_subject": "SVPL1234", "sks": 2 },
+    "academicPeriod": { "id_academic_period": 1, "name": "Semester Ganjil 2024/2025", "start_date": "2024-09-01", "end_date": "2025-01-31", "is_active": true },
+    "lecturers": [{ "id_user_si": 20, "name": "Dr. William, M.Kom", "email": "william@ugn.ac.id" }],
+    "students": [{ "id_user_si": 100, "name": "Wachyoudi", "email": "wachyoudi@student.ugn.ac.id" }],
+    "schedules": [{ "id_schedule": 1, "id_class": 10, "date": "2024-09-09", "is_active": true, "created_at": "...", "updated_at": "..." }]
+  }
+}
+```
+
+---
+
+### E4. PUT /api/manager/classes/{id}
+**Deskripsi**: Update data kelas. Tidak bisa mengubah `day_of_week` jika kelas sudah punya jadwal.
+
+**Path Params**: `id` (integer, required)
+
+**Request Body**: sama struktur dengan E2 (semua field wajib).
+
+**Response Sukses (200)**: sama struktur dengan E2 (tanpa `created_at`).
+
+**Response Error (422)** (kapasitas kurang):
+```json
+{
+  "status": "error",
+  "message": "Tidak dapat mengubah maksimal mahasiswa menjadi 10 karena sudah ada 25 mahasiswa terdaftar di kelas ini."
+}
+```
+
+**Response Error (422)** (hari berubah tapi sudah ada jadwal):
+```json
+{
+  "status": "failed",
+  "message": "Kelas ini sudah memiliki jadwal, tidak dapat mengubah hari kelas."
+}
+```
+
+---
+
+### E5. PATCH /api/manager/classes/{id}/toggle-status
+**Deskripsi**: Toggle status aktif/non-aktif kelas.
+
+**Path Params**: `id` (integer, required)
+
+**Request Body**: kosong / tidak diperlukan
+
+**Response Sukses (200)**:
+```json
+{
+  "status": "success",
+  "message": "Status kelas berhasil diubah.",
+  "data": { "id_class": 10, "code_class": "A", "is_active": false }
+}
+```
+
+---
+
+### E6. POST /api/manager/classes/{id}/lecturers
+**Deskripsi**: Assign dosen ke kelas (tambahkan jika belum ada).
+
+**Path Params**: `id` (integer, required)
+
+**Request Body**:
+```json
+{ "id_user_si": 20 }
+```
+
+| Field      | Type    | Required | Keterangan            |
+|------------|---------|----------|-----------------------|
+| id_user_si | integer | required | User ID dosen (role harus `dosen`) |
+
+**Response Sukses (200)**:
+```json
+{ "status": "success", "message": "Dosen berhasil ditambahkan ke kelas." }
+```
+
+**Response Error (422)**:
+```json
+{ "status": "error", "message": "Pengguna yang dipilih bukan seorang dosen." }
+```
+
+---
+
+### E7. POST /api/manager/classes/{id}/students
+**Deskripsi**: Assign mahasiswa ke kelas (tambahkan jika belum ada, cek kapasitas).
+
+**Path Params**: `id` (integer, required)
+
+**Request Body**:
+```json
+{ "id_user_si": 100 }
+```
+
+**Response Sukses (200)**:
+```json
+{ "status": "success", "message": "Mahasiswa berhasil ditambahkan ke kelas." }
+```
+
+**Response Error (422)** (bukan mahasiswa):
+```json
+{ "status": "error", "message": "Pengguna yang dipilih bukan seorang mahasiswa." }
+```
+
+**Response Error (422)** (kelas penuh):
+```json
+{ "status": "error", "message": "Kelas sudah mencapai kapasitas maksimal mahasiswa." }
+```
+
+---
+
+### E8. DELETE /api/manager/classes/{id}/lecturers/{lecturerId}
+**Deskripsi**: Hapus (detach) dosen dari kelas.
+
+**Path Params**:
+| Param      | Type    | Required | Keterangan     |
+|------------|---------|----------|----------------|
+| id         | integer | required | ID kelas       |
+| lecturerId | integer | required | ID user dosen  |
+
+**Response Sukses (200)**:
+```json
+{ "status": "success", "message": "Dosen berhasil dikeluarkan dari kelas." }
+```
+
+---
+
+### E9. DELETE /api/manager/classes/{id}/students/{studentId}
+**Deskripsi**: Hapus (detach) mahasiswa dari kelas.
+
+**Path Params**:
+| Param     | Type    | Required | Keterangan        |
+|-----------|---------|----------|-------------------|
+| id        | integer | required | ID kelas          |
+| studentId | integer | required | ID user mahasiswa |
+
+**Response Sukses (200)**:
+```json
+{ "status": "success", "message": "Mahasiswa berhasil dikeluarkan dari kelas." }
+```
+
+---
+
+## F. Periode Akademik
+
+Middleware: `auth:sanctum` (GET: semua role; POST/PUT/DELETE: `role:admin|manager`)
+Base prefix: `/api/academic-periods`
+
+---
+
+### F1. GET /api/academic-periods
+**Deskripsi**: Daftar semua periode akademik.
+
+**Query Params**: —
+
+**Response Sukses (200)**:
+```json
+{
+  "status": "success",
+  "message": "Daftar periode akademik berhasil diambil.",
+  "data": [
+    {
+      "id_academic_period": 1,
+      "name": "Semester Ganjil 2024/2025",
+      "start_date": "2024-09-01",
+      "end_date": "2025-01-31",
+      "is_active": true,
+      "status": "Aktif",
+      "total_classes": 45,
+      "created_at": "...",
+      "updated_at": "..."
+    }
+  ]
+}
+```
+
+---
+
+### F2. GET /api/academic-periods/{id}
+**Deskripsi**: Detail satu periode akademik beserta statistik kelas.
+
+**Path Params**: `id` (integer, required)
+
+**Response Sukses (200)**:
+```json
+{
+  "status": "success",
+  "message": "Detail periode akademik berhasil diambil.",
+  "data": {
+    "id_academic_period": 1,
+    "name": "Semester Ganjil 2024/2025",
+    "start_date": "2024-09-01",
+    "end_date": "2025-01-31",
+    "is_active": true,
+    "status": "Aktif",
+    "total_classes": 45,
+    "active_classes": 40,
+    "inactive_classes": 5,
+    "duration_days": 152,
+    "duration_months": 5,
+    "created_at": "...",
+    "updated_at": "..."
+  }
+}
+```
+
+---
+
+### F3. POST /api/academic-periods
+**Deskripsi**: Buat periode akademik baru.
+
+**Request Body**:
+```json
+{
+  "name": "Semester Ganjil 2025/2026",
+  "start_date": "2025-09-01",
+  "end_date": "2026-01-31",
+  "is_active": false,
+  "all_class": false
+}
+```
+
+| Field      | Type    | Required | Keterangan                                                    |
+|------------|---------|----------|---------------------------------------------------------------|
+| name       | string  | required | Format wajib: `"Semester Ganjil/Genap YYYY/YYYY"`, unik      |
+| start_date | date    | required | Format `YYYY-MM-DD`, tidak boleh sebelum hari ini             |
+| end_date   | date    | required | Format `YYYY-MM-DD`, harus setelah `start_date`              |
+| is_active  | boolean | required | Jika `true`, periode lain otomatis dinonaktifkan              |
+| all_class  | boolean | optional | Jika `true` + `is_active=true`, aktifkan semua kelas periode ini |
+
+**Response Sukses (201)**:
+```json
+{
+  "status": "success",
+  "message": "Periode akademik berhasil ditambahkan. 1 periode lain telah dinonaktifkan.",
+  "data": {
+    "id_academic_period": 2,
+    "name": "Semester Ganjil 2025/2026",
+    "start_date": "2025-09-01",
+    "end_date": "2026-01-31",
+    "is_active": true,
+    "deactivated_other_periods_count": 1,
+    "deactivated_other_classes_count": 45,
+    "changed_current_period_classes_count": 0,
+    "created_at": "...",
+    "updated_at": "..."
+  }
+}
+```
+
+**Response Error (422)**:
+```json
+{ "message": "...", "errors": { "name": ["Format nama periode harus: 'Semester Ganjil/Genap YYYY/YYYY'."] } }
+```
+
+---
+
+### F4. PUT /api/academic-periods/{id}
+**Deskripsi**: Update periode akademik.
+
+**Path Params**: `id` (integer, required)
+
+**Request Body**: sama dengan F3 (kecuali `start_date` boleh lampau).
+
+**Response Sukses (200)**: sama struktur dengan F3.
+
+---
+
+### F5. PUT /api/academic-periods/{id}/toggle-status
+**Deskripsi**: Toggle aktif/nonaktif periode. Jika diaktifkan, semua periode lain otomatis dinonaktifkan.
+
+**Path Params**: `id` (integer, required)
+
+**Request Body**:
+```json
+{ "all_class": true }
+```
+
+| Field     | Type    | Required | Keterangan                                                       |
+|-----------|---------|----------|------------------------------------------------------------------|
+| all_class | boolean | optional | Jika `true` dan periode diaktifkan, aktifkan semua kelas periode ini |
+
+**Response Sukses (200)**:
+```json
+{
+  "status": "success",
+  "message": "Periode akademik 'Semester Ganjil 2024/2025' berhasil diaktifkan. 1 periode lain dinonaktifkan.",
+  "data": {
+    "id_academic_period": 1,
+    "name": "Semester Ganjil 2024/2025",
+    "is_active": true,
+    "toggled_to_active": true,
+    "status_changed": true,
+    "deactivated_other_periods_count": 1,
+    "deactivated_other_classes_count": 40,
+    "changed_current_period_classes_count": 0,
+    "updated_at": "..."
+  }
+}
+```
+
+---
+
+### F6. DELETE /api/academic-periods/{id}
+**Deskripsi**: Hapus periode akademik. Gagal jika masih ada kelas yang menggunakan periode ini.
+
+**Path Params**: `id` (integer, required)
+
+**Response Sukses (200)**:
+```json
+{
+  "status": "success",
+  "message": "Periode akademik berhasil dihapus.",
+  "data": { "id_academic_period": 1, "name": "Semester Ganjil 2024/2025", "deleted_at": "..." }
+}
+```
+
+**Response Error (422)**:
+```json
+{
+  "status": "failed",
+  "message": "Periode akademik tidak dapat dihapus karena sudah digunakan di kelas.",
+  "errors": { "id_academic_period": ["Terdapat 45 kelas yang menggunakan periode ini."] }
+}
+```
+
+---
+
+## Role & Permission Matrix
+
+| Endpoint                                    | admin | manager |
+|---------------------------------------------|-------|---------|
+| GET  /manager/krs/students                  | ✅    | ✅      |
+| GET  /manager/krs                           | ✅    | ✅      |
+| GET  /manager/krs/students/{id}             | ✅    | ✅      |
+| PATCH /manager/krs/{id}/approve             | ✅    | ✅      |
+| PATCH /manager/krs/{id}/reject              | ✅    | ✅      |
+| POST/GET/PATCH/DELETE /manager/krs-sessions | ✅    | ✅      |
+| POST/GET/PATCH/DELETE /manager/krs-quotas   | ✅    | ✅      |
+| CRUD /manager/subjects                      | ✅    | ✅      |
+| CRUD /manager/classes                       | ✅    | ✅      |
+| GET  /academic-periods                      | ✅    | ✅      |
+| POST/PUT/DELETE /academic-periods           | ✅    | ✅      |
+| GET/POST/DELETE /admin/managers             | ✅    | ❌      |
+
+---
+
+## Gap Analysis — Halaman approvalKRS vs Backend
+
+### Halaman List (`/adminpage/approvalKRS`)
+Dummy FE menampilkan per baris: **nama, NIM, prodi, semester, total SKS, jumlah MK, tanggal pengajuan, status**.
+
+| Field dummy     | Tersedia di BE                         | Status          |
+|-----------------|----------------------------------------|-----------------|
+| nama            | ✅ `student.name` (A1)                 | OK              |
+| NIM             | ❌ hanya `username` (bukan NIM)        | ⚠️ Gap          |
+| prodi           | ❌ tidak ada di response KRS           | ⚠️ Gap          |
+| semester        | ❌ tidak ada di response KRS           | ⚠️ Gap          |
+| total SKS       | ✅ bisa dihitung dari `krs[]` (A2)     | OK (dari A2)    |
+| jumlah MK       | ✅ `total_krs` (A1)                   | OK              |
+| tanggal pengajuan | ✅ `created_at` entry KRS terbaru     | OK (dari A2)    |
+| status          | ✅ `pending/approved/rejected` (A1)   | OK              |
+
+> ⚠️ **NIM, prodi, semester tidak tersedia** dari endpoint KRS saat ini.
+> Endpoint A1 dan A2 hanya mengembalikan `name` dan `username`.
+> Untuk menampilkan data tersebut perlu join dengan tabel profil mahasiswa.
+> Opsi:
+> 1. Tambah data profil ke response backend (koordinasi tim BE).
+> 2. Fetch profil per mahasiswa terpisah (`GET /api/manager/students` + detail).
+> 3. Sementara tampilkan `username` sebagai pengganti NIM.
+
+### Halaman Detail (`/adminpage/approvalKRS/{id}`)
+Dummy FE menampilkan: **nama, NIM, prodi, IPK, semester**, plus tabel mata kuliah dengan kolom **kode, nama, dosen, jadwal, kelas, SKS, jenis (wajib/pilihan)**.
+
+| Field dummy     | Tersedia di BE (A3)                        | Status          |
+|-----------------|--------------------------------------------|-----------------|
+| nama            | ✅ `student.name`                          | OK              |
+| NIM             | ❌ hanya `username`                        | ⚠️ Gap          |
+| prodi           | ❌ tidak ada                               | ⚠️ Gap          |
+| IPK             | ❌ tidak ada                               | ⚠️ Gap          |
+| semester        | ❌ tidak ada                               | ⚠️ Gap          |
+| kode MK         | ✅ `krsClass.subject.code_subject`         | OK              |
+| nama MK         | ✅ `krsClass.subject.name_subject`         | OK              |
+| dosen           | ✅ `krsClass.lecturers[].name`             | OK              |
+| jadwal          | ✅ `krsClass.day_of_week` + `start/end`    | OK (perlu format)|
+| kelas           | ✅ `krsClass.code_class`                   | OK              |
+| SKS             | ✅ `krsClass.subject.sks`                  | OK              |
+| jenis (wajib)   | ❌ tidak ada field jenis di KRS/subject    | ⚠️ Gap          |
+
+> ⚠️ **Jenis mata kuliah (Wajib/Pilihan)** tidak ada di tabel `subjects` atau `krs`.
+> ⚠️ **Approve menerima catatan opsional** di dummy — backend tidak menyimpan catatan approver.
+
+---
+
+## Catatan Fetching untuk Frontend
+
+1. Sertakan `Authorization: Bearer <token>` dan `Accept: application/json` di **setiap** request.
+2. Handle error berdasarkan status code:
+   - `400` → Bad Request
+   - `401` → Token expired → bersihkan cookie dan redirect ke `/loginpage`
+   - `403` → Role tidak diizinkan → tampilkan "Akses ditolak"
+   - `404` → Data tidak ditemukan
+   - `422` → Validasi / business rule — tampilkan `message` ke user
+   - `500` → Server error — log + tampilkan pesan umum
+3. Endpoint **approve/reject** (`PATCH`) — **wajib konfirmasi dialog sebelum dipanggil** (sudah ada di UI tapi masih pakai dummy).
+4. Endpoint **delete** dan **close session** bersifat destruktif — konfirmasi sebelum dieksekusi.
+5. Pagination: selalu cek `last_page` dan `current_page` sebelum tombol "Muat lebih banyak" / infinite scroll.
+6. `day_of_week` di respons kelas adalah integer (1=Senin, ..., 7=Minggu) — perlu mapping di FE.
+
+---
+
+## Environment Variables yang Dibutuhkan Frontend
+
+| Variable                   | Contoh Nilai                           | Keterangan                   |
+|----------------------------|----------------------------------------|------------------------------|
+| NEXT_PUBLIC_API_BASE_URL   | https://Be-Sia.trisuladana.com/api     | Base URL backend (tanpa `/`) |
+| NEXT_PUBLIC_API_TIMEOUT    | 30000                                  | Timeout request dalam ms     |
