@@ -16,22 +16,19 @@ import {
 import { Button } from '@/components/ui/button';
 import { ErrorMessageBox, SuccessMessageBoxWithButton } from '@/components/ui/message-box';
 import { AlertConfirmationRedDialog } from '@/components/ui/alert-dialog';
+import { getKrsSessionDetail, closeKrsSession } from '@/services/adminKrsSessionService';
 
 export const dynamic = 'force-dynamic';
 
-// TODO: replace with real API
-async function fetchKrsSessionById(id) {
-  const mock = {
-    1: { id: 1, name: 'Semester Ganjil 2024/2025', start_date: '2025-01-01', end_date: '2025-01-16', status: 'selesai' },
-    2: { id: 2, name: 'Semester Genap 2024/2025',  start_date: '2025-01-01', end_date: '2025-01-16', status: 'aktif' },
-    3: { id: 3, name: 'Semester Ganjil 2025/2026', start_date: '2025-01-01', end_date: '2025-01-16', status: 'nonaktif' },
-    4: { id: 4, name: 'Semester Genap 2025/2026',  start_date: '2025-01-01', end_date: '2025-01-16', status: 'nonaktif' },
-  };
-  return { status: 'success', data: mock[id] ?? null };
-}
-
-async function updateKrsSession(id, data) {
-  return { status: 'success' };
+function resolveErrorMessage(err) {
+  if (!err) return 'Terjadi kesalahan, coba beberapa saat lagi';
+  if (err.status === 403) return 'Anda tidak memiliki akses ke fitur ini';
+  if (err.status >= 500)  return 'Terjadi kesalahan, coba beberapa saat lagi';
+  if (err.errors && typeof err.errors === 'object') {
+    const msgs = Object.values(err.errors).flat().filter(Boolean);
+    if (msgs.length) return msgs.join(' ');
+  }
+  return err.message || 'Terjadi kesalahan, coba beberapa saat lagi';
 }
 
 const STATUS_OPTIONS = [
@@ -67,24 +64,26 @@ function EditSesiKRSForm() {
       return;
     }
     (async () => {
-      try {
-        const res = await fetchKrsSessionById(Number(id));
-        if (res.status === 'success' && res.data) {
-          const s = res.data;
-          setFormData({
-            name:       s.name       ?? '',
-            start_date: s.start_date ?? '',
-            end_date:   s.end_date   ?? '',
-            status:     s.status     ?? '',
-          });
-        } else {
-          setFetchError('Data sesi tidak ditemukan.');
-        }
-      } catch (e) {
-        setFetchError('Gagal memuat data sesi: ' + e.message);
-      } finally {
+      // B3 — prefill dari detail sesi KRS yang ada.
+      const { data, error: err } = await getKrsSessionDetail(id);
+      if (err) {
+        setFetchError(err.status === 404 ? 'Data sesi tidak ditemukan.' : resolveErrorMessage(err));
         setIsFetching(false);
+        return;
       }
+      const s = data?.data;
+      if (!s) {
+        setFetchError('Data sesi tidak ditemukan.');
+        setIsFetching(false);
+        return;
+      }
+      setFormData({
+        name:       s.academic_period?.name ?? '',
+        start_date: (s.opened_at ?? '').slice(0, 10),
+        end_date:   s.closed_at ? s.closed_at.slice(0, 10) : '',
+        status:     s.status === 'open' ? 'aktif' : 'selesai',
+      });
+      setIsFetching(false);
     })();
   }, [id]);
 
@@ -115,19 +114,24 @@ function EditSesiKRSForm() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validate()) return;
-    setIsLoading(true);
-    try {
-      const res = await updateKrsSession(id, formData);
-      if (res.status === 'success') {
-        setSuccess('Sesi KRS berhasil diperbarui.');
-      } else {
-        setErrors(prev => ({ ...prev, form: res.message || 'Gagal memperbarui data.' }));
+    // BE tidak menyediakan endpoint update sesi KRS — satu-satunya mutasi sesi
+    // adalah tutup sesi (B4). Jika status diubah ke "Selesai", tutup sesinya.
+    if (formData.status === 'selesai') {
+      setIsLoading(true);
+      const { error: err } = await closeKrsSession(id, true);
+      if (err) {
+        setErrors(prev => ({ ...prev, form: resolveErrorMessage(err) }));
+        setIsLoading(false);
+        return;
       }
-    } catch (err) {
-      setErrors(prev => ({ ...prev, form: err.message }));
-    } finally {
+      setSuccess('Sesi KRS berhasil ditutup.');
       setIsLoading(false);
+      return;
     }
+    setErrors(prev => ({
+      ...prev,
+      form: 'Backend hanya mendukung penutupan sesi. Ubah status ke "Selesai" untuk menutup sesi; perubahan field lain belum dapat disimpan.',
+    }));
   };
 
   return (

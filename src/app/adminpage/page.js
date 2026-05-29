@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { DashboardCard, StatCard } from '@/components/ui/dashboard-card'
@@ -103,6 +104,17 @@ const GradeIcon = () => (
 export default function AdminDashboard() {
   const router = useRouter();
 
+  // Role berasal dari cookie yang hanya ada di client. Saat SSR Cookies.get()
+  // mengembalikan undefined sehingga kartu khusus admin tidak dirender, tetapi
+  // di client kartu itu muncul → daftar kartu bergeser → hydration mismatch.
+  // Gate role di belakang flag `mounted`: render pertama (server & client) sama,
+  // kartu khusus admin baru muncul setelah komponen ter-mount.
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    setIsAdmin(Cookies.get('roles') === 'admin');
+  }, []);
+
   // Use the extracted hook for statistics
   const { statistics, isLoading: loading, error, refetch: fetchStatistics } = useDashboardStats();
 
@@ -180,7 +192,7 @@ export default function AdminDashboard() {
       action: () => handleCardClick('manage-student')
     },
     // Card Tambah Akun Manajer hanya untuk admin
-    ...(Cookies.get('roles') === 'admin' ? [{
+    ...(isAdmin ? [{
       id: 'manage-manager',
       title: 'Manajemen Akun Manajer',
       description: 'Buat akun manajer untuk administrasi',

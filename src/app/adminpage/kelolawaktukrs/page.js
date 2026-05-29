@@ -30,30 +30,19 @@ import {
 } from '@/components/ui/alert-dialog';
 import { OutlineButton, WarningButton } from '@/components/ui/button';
 import { ErrorMessageBoxWithButton } from '@/components/ui/message-box';
+import { getKrsSessions, closeKrsSession } from '@/services/adminKrsSessionService';
 
-// ─── Dummy helpers (replace with real API calls) ────────────────────────────
-async function fetchKrsSessions() {
-  // TODO: replace with real API
-  return {
-    status: 'success',
-    data: [
-      { id: 1, name: 'Semester Ganjil 2024/2025', start_date: '2025-01-01', end_date: '2025-01-16', status: 'selesai' },
-      { id: 2, name: 'Semester Genap 2024/2025', start_date: '2025-01-01', end_date: '2025-01-16', status: 'aktif' },
-      { id: 3, name: 'Semester Ganjil 2025/2026', start_date: '2025-01-01', end_date: '2025-01-16', status: 'nonaktif' },
-      { id: 4, name: 'Semester Genap 2025/2026', start_date: '2025-01-01', end_date: '2025-01-16', status: 'nonaktif' },
-    ],
-  };
+// ─── Helpers ────────────────────────────────────────────────────────────────
+// Status BE sesi KRS hanya open/closed → petakan ke status badge UI.
+function mapSessionStatus(apiStatus) {
+  return apiStatus === 'open' ? 'aktif' : 'selesai';
 }
 
-async function deleteKrsSession(id) {
-  // TODO: replace with real API
-  return { status: 'success' };
-}
-
-async function toggleKrsSessionStatus(id, currentStatus) {
-  // TODO: replace with real API  — cycles: aktif → nonaktif → aktif
-  const next = currentStatus === 'aktif' ? 'nonaktif' : 'aktif';
-  return { status: 'success', data: { status: next } };
+function resolveErrorMessage(err) {
+  if (!err) return 'Terjadi kesalahan, coba beberapa saat lagi';
+  if (err.status === 403) return 'Anda tidak memiliki akses ke fitur ini';
+  if (err.status >= 500)  return 'Terjadi kesalahan, coba beberapa saat lagi';
+  return err.message || 'Terjadi kesalahan, coba beberapa saat lagi';
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -90,6 +79,8 @@ export default function KelolaWaktuKRS() {
   const [sessions, setSessions]       = useState([]);
   const [loading, setLoading]         = useState(true);
   const [error, setError]             = useState(null);
+  const [refreshKey, setRefreshKey]   = useState(0);
+  const refetch = () => setRefreshKey((k) => k + 1);
 
   // dialogs
   const [deleteTarget, setDeleteTarget]   = useState(null);
@@ -98,25 +89,30 @@ export default function KelolaWaktuKRS() {
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [dialogMessage, setDialogMessage] = useState('');
 
-  // ── Fetch ────────────────────────────────────────────────────────────────
+  // ── Fetch (B1) ─────────────────────────────────────────────────────────────
   const loadSessions = async () => {
     setLoading(true);
     setError(null);
-    try {
-      const res = await fetchKrsSessions();
-      if (res.status === 'success') {
-        setSessions(res.data);
-      } else {
-        setError('Gagal mengambil data sesi KRS.');
-      }
-    } catch (e) {
-      setError('Terjadi kesalahan: ' + e.message);
-    } finally {
+    const { data, error: err } = await getKrsSessions();
+    if (err) {
+      setSessions([]);
+      setError(resolveErrorMessage(err));
       setLoading(false);
+      return;
     }
+    // B1: paginasi ada di data.data → { current_page, data: [...], ... }
+    const rows = (data?.data?.data ?? []).map((s) => ({
+      id:         s.id_krs_session,
+      name:       s.academic_period?.name ?? `Sesi KRS #${s.id_krs_session}`,
+      start_date: (s.opened_at ?? '').slice(0, 10),
+      end_date:   s.closed_at ? s.closed_at.slice(0, 10) : '',
+      status:     mapSessionStatus(s.status),
+    }));
+    setSessions(rows);
+    setLoading(false);
   };
 
-  useEffect(() => { loadSessions(); }, []);
+  useEffect(() => { loadSessions(); }, [refreshKey]);
 
   // ── Stats ────────────────────────────────────────────────────────────────
   const total    = sessions.length;
@@ -135,38 +131,33 @@ export default function KelolaWaktuKRS() {
     setShowDeleteDialog(true);
   };
 
+  // Catatan: BE TIDAK punya endpoint hapus sesi. Aksi destruktif sesi yang
+  // tersedia hanya "tutup sesi" (B4) → tombol Hapus & Power di-map ke close.
   const confirmDelete = async () => {
     setShowDeleteDialog(false);
-    try {
-      const res = await deleteKrsSession(deleteTarget.id);
-      if (res.status === 'success') {
-        setSessions(prev => prev.filter(s => s.id !== deleteTarget.id));
-        setDialogMessage(`Sesi "${deleteTarget.name}" berhasil dihapus.`);
-        setShowSuccessDialog(true);
-      } else {
-        setDialogMessage('Gagal menghapus sesi KRS.');
-        setShowErrorDialog(true);
-      }
-    } catch (e) {
-      setDialogMessage('Terjadi kesalahan: ' + e.message);
+    const target = deleteTarget;
+    setDeleteTarget(null);
+    if (!target) return;
+    const { error: err } = await closeKrsSession(target.id, true);
+    if (err) {
+      setDialogMessage(resolveErrorMessage(err));
       setShowErrorDialog(true);
-    } finally {
-      setDeleteTarget(null);
+      return;
     }
+    setDialogMessage(`Sesi "${target.name}" berhasil ditutup.`);
+    setShowSuccessDialog(true);
+    refetch();
   };
 
   const handleToggleStatus = async (session) => {
-    try {
-      const res = await toggleKrsSessionStatus(session.id, session.status);
-      if (res.status === 'success') {
-        setSessions(prev =>
-          prev.map(s => s.id === session.id ? { ...s, status: res.data.status } : s)
-        );
-      }
-    } catch (e) {
-      setDialogMessage('Gagal mengubah status sesi: ' + e.message);
+    if (!confirm('Yakin ingin menutup sesi KRS ini?')) return;
+    const { error: err } = await closeKrsSession(session.id, true);
+    if (err) {
+      setDialogMessage(resolveErrorMessage(err));
       setShowErrorDialog(true);
+      return;
     }
+    refetch();
   };
 
   const handleBack = () => router.push('/adminpage');

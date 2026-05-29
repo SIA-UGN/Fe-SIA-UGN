@@ -15,80 +15,24 @@ import {
 import AdminNavbar from '@/components/ui/admin-navbar';
 import Footer from '@/components/ui/footer';
 import { ErrorMessageBoxWithButton } from '@/components/ui/message-box';
+import { getKRSWithProfile } from '@/services/krsApprovalService';
 
-// ─── Dummy Data (replace with real API calls) ────────────────────────────────
-async function fetchKrsSubmissions() {
-  return {
-    status: 'success',
-    data: [
-      {
-        id: 1,
-        nama: 'Wachyoudi',
-        nim: '123456',
-        prodi: 'Teknik Informatika S1',
-        semester: 5,
-        sks: 20,
-        mk: 6,
-        tanggal: '5 Maret 2026 pukul 14.30',
-        status: 'menunggu',
-      },
-      {
-        id: 2,
-        nama: 'Mulyadi Rizki',
-        nim: '123457',
-        prodi: 'Teknik Informatika S1',
-        semester: 3,
-        sks: 18,
-        mk: 5,
-        tanggal: '5 Maret 2026 pukul 09.15',
-        status: 'menunggu',
-      },
-      {
-        id: 3,
-        nama: 'Siti Nurhaliza',
-        nim: '123458',
-        prodi: 'Sistem Informasi S1',
-        semester: 7,
-        sks: 22,
-        mk: 6,
-        tanggal: '4 Maret 2026 pukul 16.45',
-        status: 'disetujui',
-      },
-      {
-        id: 4,
-        nama: 'Ahmad Fauzi',
-        nim: '123459',
-        prodi: 'Manajemen S1',
-        semester: 5,
-        sks: 12,
-        mk: 4,
-        tanggal: '4 Maret 2026 pukul 11.00',
-        status: 'ditolak',
-      },
-      {
-        id: 5,
-        nama: 'Dewi Kartika',
-        nim: '123460',
-        prodi: 'Manajemen S1',
-        semester: 3,
-        sks: 20,
-        mk: 6,
-        tanggal: '6 Maret 2026 pukul 08.30',
-        status: 'menunggu',
-      },
-      {
-        id: 6,
-        nama: 'Budi Santoso',
-        nim: '123461',
-        prodi: 'Sistem Informasi S1',
-        semester: 1,
-        sks: 24,
-        mk: 8,
-        tanggal: '6 Maret 2026 pukul 10.20',
-        status: 'disetujui',
-      },
-    ],
-  };
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+// A1 mengembalikan count per status (pending/approved/rejected), bukan satu status
+// tunggal. Turunkan status baris dari count tersebut.
+function deriveStatus(item) {
+  if ((item?.pending_count ?? 0) > 0)  return 'menunggu';
+  if ((item?.approved_count ?? 0) > 0) return 'disetujui';
+  if ((item?.rejected_count ?? 0) > 0) return 'ditolak';
+  return 'menunggu';
+}
+
+// Map error descriptor service ({ status, message, errors }) → pesan UI.
+function resolveErrorMessage(err) {
+  if (!err) return 'Terjadi kesalahan, coba beberapa saat lagi';
+  if (err.status === 403) return 'Anda tidak memiliki akses ke fitur ini';
+  if (err.status >= 500)  return 'Terjadi kesalahan, coba beberapa saat lagi';
+  return err.message || 'Terjadi kesalahan, coba beberapa saat lagi';
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -136,18 +80,28 @@ export default function ApprovalKRSPage() {
   const loadSubmissions = async () => {
     setLoading(true);
     setError(null);
-    try {
-      const res = await fetchKrsSubmissions();
-      if (res.status === 'success') {
-        setSubmissions(res.data);
-      } else {
-        setError('Gagal mengambil data pengajuan KRS.');
-      }
-    } catch (e) {
-      setError('Terjadi kesalahan: ' + e.message);
-    } finally {
+    const { data, error: err } = await getKRSWithProfile();
+    if (err) {
+      setSubmissions([]);
+      setError(resolveErrorMessage(err));
       setLoading(false);
+      return;
     }
+    // getKRSWithProfile mengembalikan objek paginasi { data: [...], total, ... }
+    // tiap item = ringkasan A1 yang sudah di-merge profil (nim/prodi/semester/ipk).
+    const rows = (data?.data ?? []).map((item) => ({
+      id:       item.student?.id_user_si,
+      nama:     item.student?.name ?? '-',
+      nim:      item.nim != null ? String(item.nim) : '-',
+      prodi:    item.program_studi ?? '-',
+      semester: item.semester ?? '-',
+      sks:      item.total_sks ?? '-',   // A1 tidak menyediakan total SKS
+      mk:       item.total_krs ?? 0,
+      tanggal:  '-',                     // A1 tidak menyediakan tanggal pengajuan
+      status:   deriveStatus(item),
+    }));
+    setSubmissions(rows);
+    setLoading(false);
   };
 
   useEffect(() => { loadSubmissions(); }, []);

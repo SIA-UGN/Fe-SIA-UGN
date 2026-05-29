@@ -20,35 +20,75 @@ import {
   AlertSuccessDialog,
 } from '@/components/ui/alert-dialog';
 import { OutlineButton, SuccessButton, WarningButton } from '@/components/ui/button';
+import { getStudentKrsDetail, approveKRS, rejectKRS } from '@/services/krsApprovalService';
 
-// ─── Dummy helpers ────────────────────────────────────────────────────────────
-const DUMMY_DETAIL = {
-  1: {
-    id: 1, nama: 'Wachyoudi', nim: '123456', prodi: 'Teknik Informatika S1',
-    ipk: '3.88', semester: 5, tanggal: '5 Maret 2026 pukul 14.30', status: 'menunggu',
-    matakuliah: [
-      { kode: 'SVPL1234', nama: 'Basis Data',            dosen: 'Dr. William, M.Kom', jadwal: 'Senin, 08.00–10.30',   kelas: 'Kelas A', sks: 2, jenis: 'Wajib' },
-      { kode: 'SVPL2345', nama: 'Algoritma Pemrograman', dosen: 'Dr. Budi, M.Kom',    jadwal: 'Selasa, 10.00–12.30', kelas: 'Kelas B', sks: 3, jenis: 'Wajib' },
-      { kode: 'SVPL3456', nama: 'Kalkulus',              dosen: 'Dr. Ana, M.Si',      jadwal: 'Rabu, 13.00–15.30',   kelas: 'Kelas A', sks: 3, jenis: 'Wajib' },
-      { kode: 'SVPL4567', nama: 'Pemrograman Web',       dosen: 'Dr. Rini, M.Kom',    jadwal: 'Kamis, 08.00–10.30',  kelas: 'Kelas C', sks: 3, jenis: 'Pilihan' },
-      { kode: 'SVPL5678', nama: 'Jaringan Komputer',     dosen: 'Dr. Hasan, M.T',     jadwal: 'Jumat, 10.00–12.30',  kelas: 'Kelas B', sks: 3, jenis: 'Pilihan' },
-      { kode: 'SVPL6789', nama: 'Sistem Operasi',        dosen: 'Dr. Dewi, M.Kom',    jadwal: 'Senin, 13.00–15.30',  kelas: 'Kelas A', sks: 3, jenis: 'Wajib' },
-    ],
-  },
-};
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+const DAY_MAP = { 1: 'Senin', 2: 'Selasa', 3: 'Rabu', 4: 'Kamis', 5: 'Jumat', 6: 'Sabtu', 7: 'Minggu' };
 
-async function fetchDetail(id) {
-  await new Promise(r => setTimeout(r, 300));
-  const d = DUMMY_DETAIL[id];
-  return d ? { status: 'success', data: d } : { status: 'error' };
+function formatJadwal(kc) {
+  if (!kc) return '-';
+  const raw = kc.day_of_week;
+  const day = typeof raw === 'number' ? (DAY_MAP[raw] ?? '-') : (raw ?? '-');
+  const start = (kc.start_time ?? '').slice(0, 5);
+  const end   = (kc.end_time ?? '').slice(0, 5);
+  if (!start && !end) return day;
+  return `${day}, ${start}–${end}`;
 }
 
-async function approveKrs(id, catatan) {
-  return { status: 'success' };
+function formatTanggal(krsArr) {
+  const dates = (krsArr ?? []).map((k) => k.created_at).filter(Boolean).sort();
+  if (dates.length === 0) return '-';
+  const d = new Date(dates[dates.length - 1]);
+  if (isNaN(d.getTime())) return '-';
+  return d.toLocaleString('id-ID', {
+    day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit',
+  });
 }
 
-async function rejectKrs(id, catatan) {
-  return { status: 'success' };
+// A3 memberi summary count per status → status tunggal untuk badge.
+function deriveDetailStatus(d) {
+  const s = d?.summary ?? {};
+  if ((s.pending?.count  ?? 0) > 0) return 'menunggu';
+  if ((s.approved?.count ?? 0) > 0) return 'disetujui';
+  if ((s.rejected?.count ?? 0) > 0) return 'ditolak';
+  return 'menunggu';
+}
+
+// Map response A3 (data.data) → bentuk yang dipakai JSX.
+// NIM/prodi/IPK/semester tidak tersedia di BE → fallback (username untuk NIM).
+function mapDetail(apiData) {
+  const d = apiData?.data ?? {};
+  const krsArr = d.krs ?? [];
+  return {
+    nama:     d.student?.name ?? '-',
+    nim:      d.student?.username ?? '-',
+    prodi:    '-',
+    ipk:      '-',
+    semester: '-',
+    tanggal:  formatTanggal(krsArr),
+    status:   deriveDetailStatus(d),
+    matakuliah: krsArr.map((k) => ({
+      kode:   k.krsClass?.subject?.code_subject ?? k.subject?.code_subject ?? '-',
+      nama:   k.krsClass?.subject?.name_subject ?? k.subject?.name_subject ?? '-',
+      dosen:  (k.krsClass?.lecturers ?? []).map((l) => l.name).join(', ') || '-',
+      jadwal: formatJadwal(k.krsClass),
+      kelas:  k.krsClass?.code_class ? `Kelas ${k.krsClass.code_class}` : '-',
+      sks:    k.krsClass?.subject?.sks ?? k.subject?.sks ?? 0,
+      jenis:  '-',   // BE tidak punya field wajib/pilihan
+    })),
+    krs: krsArr,     // entri mentah untuk approve/reject per id_krs
+  };
+}
+
+function resolveErrorMessage(err) {
+  if (!err) return 'Terjadi kesalahan, coba beberapa saat lagi';
+  if (err.status === 403) return 'Anda tidak memiliki akses ke fitur ini';
+  if (err.status >= 500)  return 'Terjadi kesalahan, coba beberapa saat lagi';
+  if (err.errors && typeof err.errors === 'object') {
+    const msgs = Object.values(err.errors).flat().filter(Boolean);
+    if (msgs.length) return msgs.join(' ');
+  }
+  return err.message || 'Terjadi kesalahan, coba beberapa saat lagi';
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -282,19 +322,19 @@ export default function DetailApprovalKRS() {
   const load = async () => {
     setLoading(true);
     setError(null);
-    try {
-      const res = await fetchDetail(id);
-      if (res.status === 'success') {
-        setDetail(res.data);
-        setCurrentStatus(res.data.status);
-      } else {
-        setError('Data pengajuan KRS tidak ditemukan.');
-      }
-    } catch (e) {
-      setError('Terjadi kesalahan: ' + e.message);
-    } finally {
+    const { data, error: err } = await getStudentKrsDetail(id);
+    if (err) {
+      setDetail(null);
+      setError(err.status === 404
+        ? 'Data pengajuan KRS tidak ditemukan.'
+        : resolveErrorMessage(err));
       setLoading(false);
+      return;
     }
+    const mapped = mapDetail(data);
+    setDetail(mapped);
+    setCurrentStatus(mapped.status);
+    setLoading(false);
   };
 
   useEffect(() => { load(); }, [id]);
@@ -302,40 +342,55 @@ export default function DetailApprovalKRS() {
   const totalSks = detail?.matakuliah?.reduce((a, m) => a + m.sks, 0) ?? 0;
   const totalMk  = detail?.matakuliah?.length ?? 0;
 
+  // BE approve/reject bersifat per-entri (id_krs), bukan per-mahasiswa.
+  // UI hanya punya 1 tombol per keputusan → proses semua entri pending sekaligus.
   const handleApprove = async (catatan) => {
-    try {
-      const res = await approveKrs(id, catatan);
-      if (res.status === 'success') {
-        setCurrentStatus('disetujui');
-        setDialogMessage('KRS mahasiswa berhasil disetujui.');
-        setShowApprove(false);
-        setShowSuccess(true);
-      } else {
-        setDialogMessage('Gagal menyetujui KRS.');
-        setShowError(true);
-      }
-    } catch (e) {
-      setDialogMessage('Terjadi kesalahan: ' + e.message);
+    const pending = (detail?.krs ?? []).filter((k) => k.status === 'pending');
+    if (pending.length === 0) {
+      setShowApprove(false);
+      setDialogMessage('Tidak ada pengajuan KRS berstatus menunggu untuk disetujui.');
       setShowError(true);
+      return;
     }
+    for (const k of pending) {
+      const { error: err } = await approveKRS(k.id_krs, catatan);
+      if (err) {
+        setShowApprove(false);
+        setDialogMessage(resolveErrorMessage(err));
+        setShowError(true);
+        await load(); // refresh agar entri yang sudah diproses tercermin
+        return;
+      }
+    }
+    setShowApprove(false);
+    setCurrentStatus('disetujui');
+    setDialogMessage('KRS mahasiswa berhasil disetujui.');
+    setShowSuccess(true);
   };
 
   const handleReject = async (catatan) => {
-    try {
-      const res = await rejectKrs(id, catatan);
-      if (res.status === 'success') {
-        setCurrentStatus('ditolak');
-        setDialogMessage('KRS mahasiswa berhasil ditolak.');
-        setShowReject(false);
-        setShowSuccess(true);
-      } else {
-        setDialogMessage('Gagal menolak KRS.');
-        setShowError(true);
-      }
-    } catch (e) {
-      setDialogMessage('Terjadi kesalahan: ' + e.message);
+    const pending = (detail?.krs ?? []).filter((k) => k.status === 'pending');
+    if (pending.length === 0) {
+      setShowReject(false);
+      setDialogMessage('Tidak ada pengajuan KRS berstatus menunggu untuk ditolak.');
       setShowError(true);
+      return;
     }
+    // rejectKRS butuh confirmed === true; modal ini sudah berperan sebagai konfirmasi.
+    for (const k of pending) {
+      const { error: err } = await rejectKRS(k.id_krs, catatan, true);
+      if (err) {
+        setShowReject(false);
+        setDialogMessage(resolveErrorMessage(err));
+        setShowError(true);
+        await load();
+        return;
+      }
+    }
+    setShowReject(false);
+    setCurrentStatus('ditolak');
+    setDialogMessage('KRS mahasiswa berhasil ditolak.');
+    setShowSuccess(true);
   };
 
   return (
