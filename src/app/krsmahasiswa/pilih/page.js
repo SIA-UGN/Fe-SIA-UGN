@@ -9,14 +9,9 @@ import Navbar from '@/components/ui/navigation-menu';
 import Footer from '@/components/ui/footer';
 import { Button } from '@/components/ui/button';
 import DataTable from '@/components/ui/table';
-import {
-  MOCK_AVAILABLE_SUBJECTS,
-  MOCK_DEFAULT_DRAFT_CLASS_IDS,
-  MOCK_KRS_QUOTA,
-} from '../mockData';
+import { getAvailableKrsClasses, getKrsQuota } from '@/lib/krs';
 
 const KRS_DRAFT_STORAGE_KEY = 'krs-mahasiswa-draft-selection';
-const KRS_SUBMISSION_STORAGE_KEY = 'krs-mahasiswa-last-submission';
 
 function formatTime(value) {
   if (!value) {
@@ -105,24 +100,6 @@ function saveDraftToStorage(items) {
   sessionStorage.setItem(KRS_DRAFT_STORAGE_KEY, JSON.stringify(items));
 }
 
-function hasSubmittedKrs() {
-  if (typeof window === 'undefined') {
-    return false;
-  }
-
-  try {
-    const raw = sessionStorage.getItem(KRS_SUBMISSION_STORAGE_KEY);
-    if (!raw) {
-      return false;
-    }
-
-    const parsed = JSON.parse(raw);
-    return Boolean(parsed && typeof parsed === 'object' && parsed.is_submitted === true);
-  } catch (_error) {
-    return false;
-  }
-}
-
 function calculateTotalSks(items = []) {
   return items.reduce((acc, item) => acc + Number(item?.sks || 0), 0);
 }
@@ -133,26 +110,49 @@ function normalizeSearch(value) {
 
 export default function PilihMataKuliahPage() {
   const router = useRouter();
-  const [quota] = useState(MOCK_KRS_QUOTA);
-  const [rows] = useState(() => flattenAvailableSubjects(MOCK_AVAILABLE_SUBJECTS));
+  const [quota, setQuota] = useState(null);
+  const [rows, setRows] = useState([]);
   const [draftSelection, setDraftSelection] = useState([]);
   const [search, setSearch] = useState('');
-  const [isAlreadySubmitted, setIsAlreadySubmitted] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (hasSubmittedKrs()) {
-      setIsAlreadySubmitted(true);
-      router.replace('/krsmahasiswa/status');
-      return;
-    }
+    let active = true;
 
-    const previousDraft = getDraftFromStorage();
-    const defaultDraft = rows.filter((item) => MOCK_DEFAULT_DRAFT_CLASS_IDS.includes(item.id_class));
-    const seededDraft = previousDraft.length > 0 ? previousDraft : defaultDraft;
+    (async () => {
+      setLoading(true);
+      setError(null);
 
-    setDraftSelection(seededDraft);
-    saveDraftToStorage(seededDraft);
-  }, [rows, router]);
+      // A6 (kuota) + A7 (kelas yang masih bisa dipilih) dipanggil paralel.
+      const [quotaRes, classesRes] = await Promise.all([
+        getKrsQuota(),
+        getAvailableKrsClasses(),
+      ]);
+      if (!active) return;
+
+      if (quotaRes.data?.data) {
+        setQuota(quotaRes.data.data);
+      }
+
+      if (classesRes.error) {
+        // 404 = tidak ada periode/sesi aktif → tampilkan pesan dari server.
+        setRows([]);
+        setError(classesRes.error.message);
+      } else {
+        const payload = classesRes.data?.data ?? {};
+        setRows(flattenAvailableSubjects(payload.subjects ?? []));
+      }
+
+      // Draft hanya keranjang sementara antar-halaman (pilih → review).
+      setDraftSelection(getDraftFromStorage());
+      setLoading(false);
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [router]);
 
   const draftTotalSks = useMemo(() => calculateTotalSks(draftSelection), [draftSelection]);
 
@@ -197,10 +197,6 @@ export default function PilihMataKuliahPage() {
   );
 
   const handleToggleClass = (row) => {
-    if (isAlreadySubmitted) {
-      return;
-    }
-
     const alreadySelected = selectedClassIds.has(row.id_class);
 
     if (alreadySelected) {
@@ -231,12 +227,6 @@ export default function PilihMataKuliahPage() {
   };
 
   const handleContinue = () => {
-    if (isAlreadySubmitted || hasSubmittedKrs()) {
-      toast.info('KRS sudah diajukan. Lihat Status KRS untuk detailnya.');
-      router.push('/krsmahasiswa/status');
-      return;
-    }
-
     if (draftSelection.length === 0) {
       toast.error('Pilih minimal satu mata kuliah sebelum lanjut ke review.');
       return;
@@ -359,6 +349,24 @@ export default function PilihMataKuliahPage() {
             </Button>
           </div>
 
+          {loading && (
+            <div
+              className="mb-5 p-4 rounded-2xl text-sm font-medium shadow-sm"
+              style={{ backgroundColor: '#FFFFFF', color: '#015023', fontFamily: 'Urbanist, sans-serif' }}
+            >
+              Memuat daftar kelas tersedia...
+            </div>
+          )}
+
+          {!loading && error && (
+            <div
+              className="mb-5 p-4 rounded-2xl text-sm font-medium shadow-sm"
+              style={{ backgroundColor: '#FEF3C7', color: '#92400E', border: '1px solid #FCD34D', fontFamily: 'Urbanist, sans-serif' }}
+            >
+              {error}
+            </div>
+          )}
+
           <section
             className="mb-5 p-5 lg:p-6 shadow-md"
             style={{
@@ -416,9 +424,9 @@ export default function PilihMataKuliahPage() {
                 onClick={handleContinue}
                 className="h-11 px-6 text-sm font-semibold"
                 style={{ backgroundColor: '#015023' }}
-                disabled={isAlreadySubmitted}
+                disabled={loading || draftSelection.length === 0}
               >
-                {isAlreadySubmitted ? 'Sudah Diajukan' : 'Lanjut ke Review'}
+                Lanjut ke Review
               </Button>
             </div>
           </section>

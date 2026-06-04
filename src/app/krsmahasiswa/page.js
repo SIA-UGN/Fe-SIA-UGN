@@ -14,27 +14,7 @@ import Navbar from '@/components/ui/navigation-menu';
 import Footer from '@/components/ui/footer';
 import { Button } from '@/components/ui/button';
 import DataTable from '@/components/ui/table';
-import { MOCK_KRS_QUOTA } from './mockData';
-
-const KRS_SUBMISSION_STORAGE_KEY = 'krs-mahasiswa-last-submission';
-
-function hasSubmittedKrs() {
-	if (typeof window === 'undefined') {
-		return false;
-	}
-
-	try {
-		const raw = sessionStorage.getItem(KRS_SUBMISSION_STORAGE_KEY);
-		if (!raw) {
-			return false;
-		}
-
-		const parsed = JSON.parse(raw);
-		return Boolean(parsed && typeof parsed === 'object' && parsed.is_submitted === true);
-	} catch (_error) {
-		return false;
-	}
-}
+import { getKrsQuota } from '@/lib/krs';
 
 function formatDate(value) {
 	if (!value) {
@@ -82,14 +62,37 @@ function getSessionStatusStyle(status) {
 }
 
 export default function KrsMahasiswaPage() {
-	const [isAlreadySubmitted, setIsAlreadySubmitted] = useState(false);
-	const quota = MOCK_KRS_QUOTA;
+	const [quota, setQuota] = useState(null);
+	const [loading, setLoading] = useState(true);
+	const [error, setError] = useState(null);
 
 	const activeSession = quota?.active_session ?? null;
 	const isSessionOpen = activeSession?.status === 'open';
 
 	useEffect(() => {
-		setIsAlreadySubmitted(hasSubmittedKrs());
+		let active = true;
+
+		(async () => {
+			setLoading(true);
+			setError(null);
+			// A6 — kuota SKS mahasiswa + sesi aktif.
+			const { data, error: quotaError } = await getKrsQuota();
+			if (!active) return;
+
+			if (quotaError) {
+				// 404 = kuota belum ditetapkan untuk periode aktif (bukan error fatal),
+				// tetap render halaman dengan nilai kosong + tampilkan pesan dari server.
+				setQuota(null);
+				setError(quotaError.message);
+			} else {
+				setQuota(data?.data ?? null);
+			}
+			setLoading(false);
+		})();
+
+		return () => {
+			active = false;
+		};
 	}, []);
 
 	const progress = useMemo(() => {
@@ -141,7 +144,7 @@ export default function KrsMahasiswaPage() {
 					<Link href="/krsmahasiswa/status">Status KRS</Link>
 				</Button>
 
-				{isSessionOpen && !isAlreadySubmitted ? (
+				{isSessionOpen ? (
 					<Button
 						asChild
 						className="h-10 px-4 text-sm font-semibold"
@@ -155,7 +158,7 @@ export default function KrsMahasiswaPage() {
 						className="h-10 px-4 text-sm font-semibold"
 						style={{ backgroundColor: '#6B7280' }}
 					>
-						{isAlreadySubmitted ? 'Sudah Diajukan' : 'Mulai Isi'}
+						Mulai Isi
 					</Button>
 				)}
 			</div>
@@ -191,6 +194,24 @@ export default function KrsMahasiswaPage() {
 							{quota?.academic_period?.name || 'Periode akademik aktif belum tersedia'}
 						</p>
 					</header>
+
+					{loading && (
+						<div
+							className="mb-5 p-4 rounded-2xl text-sm font-medium shadow-sm"
+							style={{ backgroundColor: '#FFFFFF', color: '#015023', fontFamily: 'Urbanist, sans-serif' }}
+						>
+							Memuat data kuota KRS...
+						</div>
+					)}
+
+					{!loading && error && (
+						<div
+							className="mb-5 p-4 rounded-2xl text-sm font-medium shadow-sm"
+							style={{ backgroundColor: '#FEF3C7', color: '#92400E', border: '1px solid #FCD34D', fontFamily: 'Urbanist, sans-serif' }}
+						>
+							{error}
+						</div>
+					)}
 
 					<section
 						className="mb-5 p-5 lg:p-6 shadow-md"

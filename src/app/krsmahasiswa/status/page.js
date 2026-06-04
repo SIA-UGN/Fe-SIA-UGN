@@ -14,9 +14,7 @@ import Navbar from '@/components/ui/navigation-menu';
 import Footer from '@/components/ui/footer';
 import { Button } from '@/components/ui/button';
 import DataTable from '@/components/ui/table';
-import { MOCK_KRS_QUOTA } from '../mockData';
-
-const KRS_SUBMISSION_STORAGE_KEY = 'krs-mahasiswa-last-submission';
+import { getMyKrsSubmissions } from '@/lib/krs';
 
 function formatTime(value) {
   if (!value) {
@@ -49,30 +47,57 @@ function calculateTotalSks(items = []) {
   return items.reduce((acc, item) => acc + Number(item?.sks || 0), 0);
 }
 
-function readSubmissionFromStorage() {
-  if (typeof window === 'undefined') {
-    return null;
+function getLecturerName(lecturers = []) {
+  if (!Array.isArray(lecturers) || lecturers.length === 0) {
+    return '-';
   }
 
-  try {
-    const raw = sessionStorage.getItem(KRS_SUBMISSION_STORAGE_KEY);
-    if (!raw) {
-      return null;
-    }
-
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === 'object' && parsed.is_submitted === true ? parsed : null;
-  } catch (_error) {
-    return null;
-  }
+  return lecturers.map((lecturer) => lecturer?.name).filter(Boolean).join(', ') || '-';
 }
 
-function saveSubmissionToStorage(payload) {
-  if (typeof window === 'undefined') {
-    return;
+/**
+ * Map daftar pengajuan KRS (A8) menjadi bentuk yang dipakai tabel.
+ * A8 mengembalikan array entri per-mata kuliah, masing-masing punya status sendiri.
+ */
+function mapKrsItemToCourse(item) {
+  const subject = item?.subject ?? {};
+  const krsClass = item?.krsClass ?? {};
+
+  return {
+    id_krs: item?.id_krs,
+    kode_mk: subject.code_subject || '-',
+    nama_mk: subject.name_subject || '-',
+    sks: Number(subject.sks || 0),
+    kode_kelas: krsClass.code_class || '-',
+    day_of_week: krsClass.day_of_week,
+    start_time: krsClass.start_time,
+    end_time: krsClass.end_time,
+    dosen: getLecturerName(krsClass.lecturers),
+    rejection_reason: item?.rejection_reason || null,
+    status: item?.status || 'pending',
+  };
+}
+
+/**
+ * Status keseluruhan halaman diturunkan dari kumpulan entri KRS:
+ *  - ada pending  → 'pending'
+ *  - semua selesai & ada approved → 'approved'
+ *  - lainnya (mis. semua rejected) → 'approved' bucket dilewati; pakai 'pending' fallback
+ */
+function deriveOverallStatus(courses = []) {
+  if (courses.length === 0) {
+    return 'none';
   }
 
-  sessionStorage.setItem(KRS_SUBMISSION_STORAGE_KEY, JSON.stringify(payload));
+  if (courses.some((course) => course.status === 'pending')) {
+    return 'pending';
+  }
+
+  if (courses.some((course) => course.status === 'approved')) {
+    return 'approved';
+  }
+
+  return 'pending';
 }
 
 function getStatusMeta(status) {
@@ -163,49 +188,52 @@ function getJenisStyle(jenis) {
 }
 
 export default function KrsStatusPage() {
-  const [submission, setSubmission] = useState(null);
+  const [courses, setCourses] = useState([]);
+  const [academicPeriod, setAcademicPeriod] = useState(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const loadSubmissions = async ({ silent = false } = {}) => {
+    if (silent) {
+      setIsRefreshing(true);
+    } else {
+      setLoading(true);
+    }
+    setError(null);
+
+    // A8 — daftar pengajuan KRS milik mahasiswa (semua status).
+    const { data, error: fetchError } = await getMyKrsSubmissions();
+
+    if (fetchError) {
+      setError(fetchError.message);
+    } else {
+      const list = Array.isArray(data?.data) ? data.data : [];
+      setCourses(list.map(mapKrsItemToCourse));
+      setAcademicPeriod(list[0]?.academicPeriod?.name ?? null);
+    }
+
+    if (silent) {
+      setIsRefreshing(false);
+      if (!fetchError) {
+        toast.success('Status KRS diperbarui.');
+      }
+    } else {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    setSubmission(readSubmissionFromStorage());
+    loadSubmissions();
   }, []);
-
-  const courses = submission?.courses || [];
 
   const totalSks = useMemo(() => calculateTotalSks(courses), [courses]);
 
-  const normalizedStatus = !submission
-    ? 'none'
-    : submission?.status === 'approved'
-      ? 'approved'
-      : 'pending';
+  const normalizedStatus = deriveOverallStatus(courses);
   const statusMeta = getStatusMeta(normalizedStatus);
 
-  const handleRefreshStatus = async () => {
-    if (!submission || normalizedStatus !== 'pending') {
-      return;
-    }
-
-    setIsRefreshing(true);
-
-    await new Promise((resolve) => {
-      setTimeout(resolve, 500);
-    });
-
-    const approvedSubmission = {
-      ...submission,
-      status: 'approved',
-      approved_at: new Date().toISOString(),
-      courses: courses.map((course) => ({
-        ...course,
-        status: 'approved',
-      })),
-    };
-
-    setSubmission(approvedSubmission);
-    saveSubmissionToStorage(approvedSubmission);
-    setIsRefreshing(false);
-    toast.success('Status KRS diperbarui: Disetujui.');
+  const handleRefreshStatus = () => {
+    loadSubmissions({ silent: true });
   };
   const approvedMeta = getStatusMeta('approved');
 
@@ -256,9 +284,21 @@ export default function KrsStatusPage() {
         {value || 'Pilihan'}
       </span>
     ),
-    status: (value) => {
-      const rowStatus = value === 'approved' || normalizedStatus === 'approved' ? 'approved' : 'pending';
-      const rowMeta = rowStatus === 'approved' ? approvedMeta : statusMeta;
+    status: (value, item) => {
+      if (value === 'rejected') {
+        return (
+          <span
+            className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-base font-semibold"
+            style={{ color: '#BE0414', backgroundColor: '#FEE2E2', border: '1px solid #FCA5A5' }}
+            title={item?.rejection_reason || undefined}
+          >
+            Ditolak
+          </span>
+        );
+      }
+
+      const rowStatus = value === 'approved' ? 'approved' : 'pending';
+      const rowMeta = rowStatus === 'approved' ? approvedMeta : getStatusMeta('pending');
 
       return (
         <span
@@ -307,9 +347,7 @@ export default function KrsStatusPage() {
                 Pengisian Kartu Rencana Studi
               </h1>
               <p className="text-base mt-2" style={{ color: '#6B7280', fontFamily: 'Urbanist, sans-serif' }}>
-                {submission?.academic_period || MOCK_KRS_QUOTA?.academic_period?.name || '-'}
-                {' · '}
-                Dosen PA: {submission?.advisor_name || 'Dr. Ahmad Fauzi, M.Kom'}
+                {academicPeriod || 'Periode akademik aktif'}
               </p>
             </div>
 
@@ -320,6 +358,24 @@ export default function KrsStatusPage() {
               </Link>
             </Button>
           </div>
+
+          {loading && (
+            <div
+              className="mb-5 p-4 rounded-2xl text-sm font-medium shadow-sm"
+              style={{ backgroundColor: '#FFFFFF', color: '#015023', fontFamily: 'Urbanist, sans-serif' }}
+            >
+              Memuat status pengajuan KRS...
+            </div>
+          )}
+
+          {!loading && error && (
+            <div
+              className="mb-5 p-4 rounded-2xl text-sm font-medium shadow-sm"
+              style={{ backgroundColor: '#FEE2E2', color: '#BE0414', border: '1px solid #FCA5A5', fontFamily: 'Urbanist, sans-serif' }}
+            >
+              {error}
+            </div>
+          )}
 
           <section
             className="mb-5 p-5 lg:p-6 shadow-md border"
