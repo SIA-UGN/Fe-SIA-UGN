@@ -382,15 +382,15 @@ export default function AdminDashboard() {
                     icon={card.icon}
                   >
                     <PrimaryButton className="w-full mt-4" onClick={card.action}>
-                      {card.id.startsWith('manage-') ? (
-                        <>
-                          <SettingsIcon />
-                          Kelola
-                        </>
-                      ) : (
+                      {card.id === 'create-broadcast' ? (
                         <>
                           <PlusIcon />
                           Buat Pengumuman
+                        </>
+                      ) : (
+                        <>
+                          <SettingsIcon />
+                          Kelola
                         </>
                       )}
                     </PrimaryButton>
