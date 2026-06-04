@@ -10,7 +10,7 @@ import Footer from '@/components/ui/footer'
 import { useDashboardStats } from '@/features/admin-dashboard/hooks/useDashboardStats'
 import Cookies from 'js-cookie'
 import { ErrorMessageBoxWithButton } from '@/components/ui/message-box'
-import { GraduationCap, Megaphone, Mail, SquareLibrary, Clock, ClipboardCheck, CreditCard } from 'lucide-react'
+import { GraduationCap, Megaphone, Mail, SquareLibrary, Clock, ClipboardCheck, CreditCard, Gauge } from 'lucide-react'
 
 // Icons - using icons from /public/icon folder
 const PlusIcon = () => (
@@ -161,6 +161,9 @@ export default function AdminDashboard() {
       case 'manage-krs-time':
         router.push('/adminpage/kelolawaktukrs');
         break;
+      case 'manage-krs-quota':
+        router.push('/adminpage/kelolakuotakrs');
+        break;
       case 'approval-krs':
         router.push('/adminpage/approvalKRS');
         break;
@@ -261,6 +264,13 @@ export default function AdminDashboard() {
       description: 'Atur jadwal pembukaan dan penutupan pengisian KRS untuk setiap semester',
       icon: <Clock className="w-8 h-8" />,
       action: () => handleCardClick('manage-krs-time')
+    },
+    {
+      id: 'manage-krs-quota',
+      title: 'Kelola Kuota KRS',
+      description: 'Tetapkan batas maksimal SKS yang dapat diambil setiap mahasiswa per periode',
+      icon: <Gauge className="w-8 h-8" />,
+      action: () => handleCardClick('manage-krs-quota')
     },
     {
       id: 'approval-krs',
