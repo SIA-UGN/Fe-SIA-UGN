@@ -115,6 +115,20 @@ export async function confirmAdminLibraryReturnAction(orderId, payload = {}) {
   }
 }
 
+export async function cancelAdminLibraryOrderAction(orderId, payload = {}) {
+  try {
+    const response = await api.patch(`/admin/library/orders/${orderId}/cancel`, payload);
+    const parsed = AdminLibraryOrderDetailResponseSchema.parse(response.data);
+
+    return {
+      item: normalizeAdminLibraryOrder(parsed.data),
+      message: parsed.message || 'Pesanan berhasil dibatalkan.',
+    };
+  } catch (error) {
+    throw toDomainError(error, 'Gagal membatalkan pesanan.');
+  }
+}
+
 export async function fetchAdminLibrarySuggestions(params = {}) {
   try {
     const response = await api.get('/admin/library/suggestions', { params: buildParams(params) });

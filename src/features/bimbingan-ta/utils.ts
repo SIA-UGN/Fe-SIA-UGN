@@ -104,7 +104,26 @@ export function getThesisHomePath(role?: string | null) {
 }
 
 export function getCurrentRole() {
-  return Cookies.get('roles') || null;
+  const cookieRole = Cookies.get('roles');
+  if (cookieRole) return cookieRole;
+
+  // Fallback: some production environments set the role cookie as HttpOnly,
+  // which `js-cookie` cannot read from client-side. In that case, try to
+  // read a lightweight user object stored in localStorage (set at login)
+  // so the UI can still determine the current role for navigation.
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const userRaw = localStorage.getItem('user');
+      if (userRaw) {
+        const parsed = JSON.parse(userRaw);
+        if (parsed && parsed.roles) return parsed.roles;
+      }
+    }
+  } catch (e) {
+    // ignore parse errors and fall through
+  }
+
+  return null;
 }
 
 export function countActiveRequests(statuses: Array<string | undefined | null>) {
