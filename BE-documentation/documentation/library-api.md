@@ -617,6 +617,34 @@ Mengubah status antara `active` dan `inactive`.
 
 ---
 
+#### `DELETE /api/admin/library/books/{id}` — Hapus Buku
+
+Menghapus buku dari sistem. Buku hanya dapat dihapus jika **tidak ada pesanan aktif** (status `ordered` atau `borrowed`).
+
+> **Catatan:** Riwayat pesanan yang sudah selesai (`returned`/`cancelled`) akan ikut terhapus via cascade.
+
+**Request Body:** _(tidak perlu body)_
+
+**Response 200:**
+
+```json
+{
+    "status": "success",
+    "message": "Buku berhasil dihapus."
+}
+```
+
+**Response 409 (Ada pesanan aktif):**
+
+```json
+{
+    "status": "error",
+    "message": "Buku tidak dapat dihapus karena masih ada 2 pesanan aktif (ordered/borrowed)."
+}
+```
+
+---
+
 ### B4. Manajemen Pesanan / Peminjaman
 
 #### `GET /api/admin/library/orders` — Daftar Semua Pesanan
@@ -729,6 +757,48 @@ Mengubah status pesanan dari `borrowed` → `returned`. Stok buku otomatis berta
 
 ---
 
+#### `PATCH /api/admin/library/orders/{id}/cancel` — Batalkan Pesanan (Admin)
+
+Admin membatalkan pesanan. Hanya pesanan dengan status `ordered` yang dapat dibatalkan. Stok buku **otomatis dikembalikan**. Notifikasi dikirim ke peminjam.
+
+**Request Body:**
+
+```json
+{
+    "admin_note": "User tidak hadir untuk mengambil buku"
+}
+```
+
+| Field | Tipe | Required | Deskripsi |
+|-------|------|----------|-----------|
+| `admin_note` | string | No | Catatan alasan pembatalan (max 500) |
+
+**Response 200:**
+
+```json
+{
+    "status": "success",
+    "message": "Pesanan berhasil dibatalkan.",
+    "data": {
+        "id_book_order": 1,
+        "status": "cancelled",
+        "admin_note": "User tidak hadir untuk mengambil buku",
+        "...": "..."
+    }
+}
+```
+
+**Response 422 (Status bukan `ordered`):**
+
+```json
+{
+    "status": "error",
+    "message": "Pesanan ini tidak dapat dibatalkan. Hanya pesanan dengan status \"ordered\" yang dapat dibatalkan oleh admin."
+}
+```
+
+---
+
 ### B5. Manajemen Usulan Buku
 
 #### `GET /api/admin/library/suggestions` — Daftar Semua Usulan
@@ -814,6 +884,7 @@ Notifikasi dikirim pada event berikut:
 |-------|------|----------|
 | Peminjaman dikonfirmasi | `library_order` | Peminjam |
 | Pengembalian dikonfirmasi | `library_order` | Peminjam |
+| Pesanan dibatalkan oleh admin | `library_order` | Peminjam |
 | Usulan buku disetujui | `library_suggestion` | Pengusul |
 | Usulan buku ditolak | `library_suggestion` | Pengusul |
 
@@ -847,11 +918,12 @@ Notifikasi dikirim pada event berikut:
 ### Alur Status Pemesanan Buku (`book_orders`)
 
 ```
-┌──────────┐     Admin konfirmasi     ┌──────────┐     Admin konfirmasi     ┌──────────┐
-│ ordered  │ ────────────────────────► │ borrowed │ ────────────────────────► │ returned │
-└──────────┘                          └──────────┘                          └──────────┘
+┌──────────┐   Admin konfirmasi   ┌──────────┐   Admin konfirmasi   ┌──────────┐
+│ ordered  │ ───────────────────► │ borrowed │ ───────────────────► │ returned │
+└──────────┘                      └──────────┘                      └──────────┘
       │
-      │  User membatalkan
+      │  User membatalkan (PATCH /library/activities/{id}/cancel)
+      │  Admin membatalkan (PATCH /admin/library/orders/{id}/cancel)
       ▼
 ┌───────────┐
 │ cancelled │
@@ -861,7 +933,7 @@ Notifikasi dikirim pada event berikut:
 - **ordered**: Buku telah dipesan, menunggu konfirmasi admin. Stok sudah dikurangi.
 - **borrowed**: Admin telah mengkonfirmasi. Buku sudah dipinjam.
 - **returned**: Admin telah mengkonfirmasi pengembalian. Stok sudah ditambah kembali.
-- **cancelled**: User membatalkan pesanan. Stok sudah ditambah kembali.
+- **cancelled**: User atau admin membatalkan pesanan. Stok sudah ditambah kembali.
 
 ### Alur Status Usulan Buku (`book_suggestions`)
 
@@ -893,7 +965,7 @@ Notifikasi dikirim pada event berikut:
 | 4 | GET | `/api/library/categories` | All Auth | Daftar kategori buku |
 | 5 | GET | `/api/library/activities` | All Auth | Riwayat peminjaman user |
 | 6 | GET | `/api/library/activities/{id}` | All Auth | Detail aktivitas |
-| 7 | PATCH | `/api/library/activities/{id}/cancel` | All Auth | Batalkan pesanan |
+| 7 | PATCH | `/api/library/activities/{id}/cancel` | All Auth | Batalkan pesanan (user) |
 | 8 | GET | `/api/library/suggestions` | All Auth | Daftar usulan buku user |
 | 9 | POST | `/api/library/suggestions` | All Auth | Kirim usulan buku |
 | 10 | GET | `/api/admin/library/dashboard` | Admin/Manager | Dashboard statistik |
@@ -906,10 +978,12 @@ Notifikasi dikirim pada event berikut:
 | 17 | GET | `/api/admin/library/books/{id}` | Admin/Manager | Detail buku + stats |
 | 18 | PUT | `/api/admin/library/books/{id}` | Admin/Manager | Update buku |
 | 19 | PATCH | `/api/admin/library/books/{id}/toggle-status` | Admin/Manager | Toggle aktif/nonaktif |
-| 20 | GET | `/api/admin/library/orders` | Admin/Manager | Daftar semua pesanan |
-| 21 | GET | `/api/admin/library/orders/{id}` | Admin/Manager | Detail pesanan |
-| 22 | PATCH | `/api/admin/library/orders/{id}/confirm-borrow` | Admin/Manager | Konfirmasi peminjaman |
-| 23 | PATCH | `/api/admin/library/orders/{id}/confirm-return` | Admin/Manager | Konfirmasi pengembalian |
-| 24 | GET | `/api/admin/library/suggestions` | Admin/Manager | Daftar semua usulan |
-| 25 | GET | `/api/admin/library/suggestions/{id}` | Admin/Manager | Detail usulan |
-| 26 | PATCH | `/api/admin/library/suggestions/{id}/respond` | Admin/Manager | Respon usulan |
+| 20 | **DELETE** | **`/api/admin/library/books/{id}`** | Admin/Manager | **Hapus buku** |
+| 21 | GET | `/api/admin/library/orders` | Admin/Manager | Daftar semua pesanan |
+| 22 | GET | `/api/admin/library/orders/{id}` | Admin/Manager | Detail pesanan |
+| 23 | PATCH | `/api/admin/library/orders/{id}/confirm-borrow` | Admin/Manager | Konfirmasi peminjaman |
+| 24 | PATCH | `/api/admin/library/orders/{id}/confirm-return` | Admin/Manager | Konfirmasi pengembalian |
+| 25 | **PATCH** | **`/api/admin/library/orders/{id}/cancel`** | Admin/Manager | **Admin batalkan pesanan** |
+| 26 | GET | `/api/admin/library/suggestions` | Admin/Manager | Daftar semua usulan |
+| 27 | GET | `/api/admin/library/suggestions/{id}` | Admin/Manager | Detail usulan |
+| 28 | PATCH | `/api/admin/library/suggestions/{id}/respond` | Admin/Manager | Respon usulan |

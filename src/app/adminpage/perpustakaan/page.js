@@ -29,6 +29,7 @@ import { AlertConfirmationRedDialog } from '@/components/ui/alert-dialog';
 import {
   createAdminLibraryCategory,
   createAdminLibraryBook,
+  deleteAdminLibraryBook,
   getAdminLibraryBooks,
   getAdminLibraryCategories,
   getAdminLibraryDashboard,
@@ -283,7 +284,7 @@ export default function AdminLibraryPage() {
     if (!bookToDelete) return;
     setTogglingId(bookToDelete.id_book);
     try {
-      const res = await toggleAdminLibraryBookStatus(bookToDelete.id_book);
+      const res = await deleteAdminLibraryBook(bookToDelete.id_book);
       toast.success(res?.message || 'Buku berhasil dihapus.');
       await fetchBooks();
       await fetchDashboard();

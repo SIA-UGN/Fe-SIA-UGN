@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ADMIN_LIBRARY_QUERY_KEYS,
+  cancelAdminLibraryOrderAction,
   confirmAdminLibraryBorrowAction,
   confirmAdminLibraryReturnAction,
   fetchAdminLibraryOrderDetail,
@@ -44,6 +45,22 @@ export function useConfirmAdminLibraryReturnMutation() {
 
   return useMutation({
     mutationFn: ({ orderId, payload }) => confirmAdminLibraryReturnAction(orderId, payload),
+    onSuccess: (_result, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['admin-library-orders'] });
+      if (variables?.orderId) {
+        queryClient.invalidateQueries({
+          queryKey: ADMIN_LIBRARY_QUERY_KEYS.orderDetail(variables.orderId),
+        });
+      }
+    },
+  });
+}
+
+export function useCancelAdminLibraryOrderMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ orderId, payload }) => cancelAdminLibraryOrderAction(orderId, payload),
     onSuccess: (_result, variables) => {
       queryClient.invalidateQueries({ queryKey: ['admin-library-orders'] });
       if (variables?.orderId) {
