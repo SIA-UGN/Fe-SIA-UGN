@@ -70,10 +70,12 @@ export default function AdminBookModal({
       publisher: form.publisher.trim() || undefined,
       year: form.year !== '' ? Number(form.year) : undefined,
       total_stock: form.total_stock !== '' ? Number(form.total_stock) : undefined,
+      stock_total: form.total_stock !== '' ? Number(form.total_stock) : undefined,
     };
 
     if (isEditing && form.available_stock !== '') {
       payload.available_stock = Number(form.available_stock);
+      payload.stock_available = Number(form.available_stock);
     }
 
     onSubmit(payload);
