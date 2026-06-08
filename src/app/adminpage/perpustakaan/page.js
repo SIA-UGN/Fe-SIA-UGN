@@ -25,6 +25,7 @@ import AdminBookModal from '@/components/library/admin-book-modal';
 import StatCard from '@/components/ui/info-card';
 import DataTable from '@/components/ui/table';
 import { ErrorMessageBoxWithButton } from '@/components/ui/message-box';
+import { AlertConfirmationRedDialog } from '@/components/ui/alert-dialog';
 import {
   createAdminLibraryCategory,
   createAdminLibraryBook,
@@ -73,6 +74,8 @@ export default function AdminLibraryPage() {
   const [editingBook, setEditingBook] = useState(null);
   const [saving, setSaving] = useState(false);
   const [togglingId, setTogglingId] = useState(null);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [bookToDelete, setBookToDelete] = useState(null);
 
   /* ── fetch dashboard ── */
   const fetchDashboard = useCallback(async () => {
@@ -196,7 +199,10 @@ export default function AdminLibraryPage() {
       </button>
       <button 
         className="text-red-500 hover:text-red-700 transition-colors"
-        onClick={() => handleDeleteBook(row.id_book)}
+        onClick={() => {
+          setBookToDelete(row);
+          setDeleteModalOpen(true);
+        }}
       >
         <Trash2 className="w-4 h-4" />
       </button>
@@ -273,11 +279,11 @@ export default function AdminLibraryPage() {
     }
   };
 
-  const handleDeleteBook = async (bookId) => {
-    if (!window.confirm('Apakah Anda yakin ingin menghapus buku ini?')) return;
-    setTogglingId(bookId);
+  const confirmDeleteBook = async () => {
+    if (!bookToDelete) return;
+    setTogglingId(bookToDelete.id_book);
     try {
-      const res = await toggleAdminLibraryBookStatus(bookId);
+      const res = await toggleAdminLibraryBookStatus(bookToDelete.id_book);
       toast.success(res?.message || 'Buku berhasil dihapus.');
       await fetchBooks();
       await fetchDashboard();
@@ -285,6 +291,8 @@ export default function AdminLibraryPage() {
       toast.error(getErrorMessage(err, 'Gagal menghapus buku.'));
     } finally {
       setTogglingId(null);
+      setDeleteModalOpen(false);
+      setBookToDelete(null);
     }
   };
 
@@ -465,6 +473,20 @@ export default function AdminLibraryPage() {
         editingBook={editingBook}
         saving={saving}
         onCreateCategory={handleCreateCategory}
+      />
+
+      {/* ── Delete Confirmation Modal ── */}
+      <AlertConfirmationRedDialog
+        open={deleteModalOpen}
+        onOpenChange={(isOpen) => {
+          setDeleteModalOpen(isOpen);
+          if (!isOpen) setBookToDelete(null);
+        }}
+        title="Hapus Buku"
+        description={`Apakah Anda yakin ingin menghapus buku "${bookToDelete?.title || ''}"?`}
+        confirmText={togglingId ? "Menghapus..." : "Hapus"}
+        cancelText="Batal"
+        onConfirm={confirmDeleteBook}
       />
           </div>
         </div>
