@@ -25,9 +25,11 @@ import AdminBookModal from '@/components/library/admin-book-modal';
 import StatCard from '@/components/ui/info-card';
 import DataTable from '@/components/ui/table';
 import { ErrorMessageBoxWithButton } from '@/components/ui/message-box';
+import { AlertConfirmationRedDialog } from '@/components/ui/alert-dialog';
 import {
   createAdminLibraryCategory,
   createAdminLibraryBook,
+  deleteAdminLibraryBook,
   getAdminLibraryBooks,
   getAdminLibraryCategories,
   getAdminLibraryDashboard,
@@ -73,6 +75,8 @@ export default function AdminLibraryPage() {
   const [editingBook, setEditingBook] = useState(null);
   const [saving, setSaving] = useState(false);
   const [togglingId, setTogglingId] = useState(null);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [bookToDelete, setBookToDelete] = useState(null);
 
   /* ── fetch dashboard ── */
   const fetchDashboard = useCallback(async () => {
@@ -162,19 +166,26 @@ export default function AdminLibraryPage() {
     <span className="text-gray-500 text-sm tracking-wide">{row.isbn}</span>
   ),
   
+  // Stok: available_stock / total_stock (sesuai response BE)
   stok: (value, row) => (
     <span className="px-3 py-1 bg-[#fefce8] text-[#a16207] rounded-full text-xs font-bold border border-yellow-100">
-      {row.stock_available}/{row.stock_total}
+      {row.available_stock ?? 0}/{row.total_stock ?? 0}
     </span>
   ),
   
-  dipinjam: (value, row) => (
-    <span className="text-gray-600 text-sm font-medium">{row.borrowed}</span>
-  ),
+  // Dipinjam: total_stock - available_stock
+  dipinjam: (value, row) => {
+    const borrowed = (row.total_stock ?? 0) - (row.available_stock ?? 0);
+    return (
+      <span className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-bold border border-blue-100">
+        {borrowed}
+      </span>
+    );
+  },
   
   pesanan: (value, row) => (
     <span className="px-3 py-1 bg-gray-100 text-gray-500 rounded-full text-xs font-bold">
-      {row.orders}x
+      {row.orders ?? '-'}
     </span>
   ),
   
@@ -189,7 +200,10 @@ export default function AdminLibraryPage() {
       </button>
       <button 
         className="text-red-500 hover:text-red-700 transition-colors"
-        onClick={() => handleDeleteBook(row.id_book)}
+        onClick={() => {
+          setBookToDelete(row);
+          setDeleteModalOpen(true);
+        }}
       >
         <Trash2 className="w-4 h-4" />
       </button>
@@ -266,18 +280,20 @@ export default function AdminLibraryPage() {
     }
   };
 
-  const handleToggleStatus = async (bookId) => {
-    if (!window.confirm('Nonaktifkan/aktifkan buku ini?')) return;
-    setTogglingId(bookId);
+  const confirmDeleteBook = async () => {
+    if (!bookToDelete) return;
+    setTogglingId(bookToDelete.id_book);
     try {
-      const res = await toggleAdminLibraryBookStatus(bookId);
-      toast.success(res?.message || 'Status buku berhasil diperbarui.');
+      const res = await deleteAdminLibraryBook(bookToDelete.id_book);
+      toast.success(res?.message || 'Buku berhasil dihapus.');
       await fetchBooks();
       await fetchDashboard();
     } catch (err) {
-      toast.error(getErrorMessage(err, 'Gagal mengubah status.'));
+      toast.error(getErrorMessage(err, 'Gagal menghapus buku.'));
     } finally {
       setTogglingId(null);
+      setDeleteModalOpen(false);
+      setBookToDelete(null);
     }
   };
 
@@ -458,6 +474,20 @@ export default function AdminLibraryPage() {
         editingBook={editingBook}
         saving={saving}
         onCreateCategory={handleCreateCategory}
+      />
+
+      {/* ── Delete Confirmation Modal ── */}
+      <AlertConfirmationRedDialog
+        open={deleteModalOpen}
+        onOpenChange={(isOpen) => {
+          setDeleteModalOpen(isOpen);
+          if (!isOpen) setBookToDelete(null);
+        }}
+        title="Hapus Buku"
+        description={`Apakah Anda yakin ingin menghapus buku "${bookToDelete?.title || ''}"?`}
+        confirmText={togglingId ? "Menghapus..." : "Hapus"}
+        cancelText="Batal"
+        onConfirm={confirmDeleteBook}
       />
           </div>
         </div>
