@@ -266,16 +266,16 @@ export default function AdminLibraryPage() {
     }
   };
 
-  const handleToggleStatus = async (bookId) => {
-    if (!window.confirm('Nonaktifkan/aktifkan buku ini?')) return;
+  const handleDeleteBook = async (bookId) => {
+    if (!window.confirm('Apakah Anda yakin ingin menghapus buku ini?')) return;
     setTogglingId(bookId);
     try {
       const res = await toggleAdminLibraryBookStatus(bookId);
-      toast.success(res?.message || 'Status buku berhasil diperbarui.');
+      toast.success(res?.message || 'Buku berhasil dihapus.');
       await fetchBooks();
       await fetchDashboard();
     } catch (err) {
-      toast.error(getErrorMessage(err, 'Gagal mengubah status.'));
+      toast.error(getErrorMessage(err, 'Gagal menghapus buku.'));
     } finally {
       setTogglingId(null);
     }
