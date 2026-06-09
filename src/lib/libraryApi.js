@@ -192,6 +192,15 @@ export const toggleAdminLibraryBookStatus = async (bookId) => {
   }
 };
 
+export const deleteAdminLibraryBook = async (bookId) => {
+  try {
+    const response = await api.delete(`/admin/library/books/${bookId}`);
+    return response.data;
+  } catch (error) {
+    requestError(error);
+  }
+};
+
 export const getAdminLibraryOrders = async (params = {}) => {
   try {
     const response = await api.get('/admin/library/orders', { params: buildParams(params) });
@@ -222,6 +231,15 @@ export const confirmAdminLibraryBorrow = async (orderId, payload = {}) => {
 export const confirmAdminLibraryReturn = async (orderId, payload = {}) => {
   try {
     const response = await api.patch(`/admin/library/orders/${orderId}/confirm-return`, payload);
+    return response.data;
+  } catch (error) {
+    requestError(error);
+  }
+};
+
+export const cancelAdminLibraryOrder = async (orderId, payload = {}) => {
+  try {
+    const response = await api.patch(`/admin/library/orders/${orderId}/cancel`, payload);
     return response.data;
   } catch (error) {
     requestError(error);
@@ -276,10 +294,12 @@ const LibraryApi = {
   getAdminLibraryBookById,
   updateAdminLibraryBook,
   toggleAdminLibraryBookStatus,
+  deleteAdminLibraryBook,
   getAdminLibraryOrders,
   getAdminLibraryOrderById,
   confirmAdminLibraryBorrow,
   confirmAdminLibraryReturn,
+  cancelAdminLibraryOrder,
   getAdminLibrarySuggestions,
   getAdminLibrarySuggestionById,
   respondAdminLibrarySuggestion,

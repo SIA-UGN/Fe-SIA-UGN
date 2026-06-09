@@ -62,15 +62,23 @@ export default function AdminBookModal({
 
   const handleSubmit = (event) => {
     event.preventDefault();
-    onSubmit({
+    const payload = {
       title: form.title.trim(),
       author: form.author.trim(),
-      id_book_category: form.id_book_category ? Number(form.id_book_category) : undefined,
+      id_book_category: form.id_book_category !== '' ? Number(form.id_book_category) : undefined,
       isbn: form.isbn.trim() || undefined,
       publisher: form.publisher.trim() || undefined,
-      year: form.year ? Number(form.year) : undefined,
-      total_stock: form.total_stock ? Number(form.total_stock) : undefined,
-    });
+      year: form.year !== '' ? Number(form.year) : undefined,
+      total_stock: form.total_stock !== '' ? Number(form.total_stock) : undefined,
+      stock_total: form.total_stock !== '' ? Number(form.total_stock) : undefined,
+    };
+
+    if (isEditing && form.available_stock !== '') {
+      payload.available_stock = Number(form.available_stock);
+      payload.stock_available = Number(form.available_stock);
+    }
+
+    onSubmit(payload);
   };
 
   const selectedCategoryName = categories.find(

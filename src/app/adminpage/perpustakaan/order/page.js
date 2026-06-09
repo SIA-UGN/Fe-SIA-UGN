@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ArrowLeft,
+  Ban,
   BookOpen,
   CheckCheck,
   CheckCircle2,
@@ -28,6 +29,7 @@ import AdminSuggestionDetailModal from '@/components/library/admin-suggestion-de
 import { formatDate, formatDateTime, getErrorMessage } from '@/features/library/utils';
 import {
   useAdminLibraryOrdersQuery,
+  useCancelAdminLibraryOrderMutation,
   useConfirmAdminLibraryBorrowMutation,
   useConfirmAdminLibraryReturnMutation,
 } from '@/features/library/hooks/useAdminLibraryOrdersQuery';
@@ -94,6 +96,7 @@ export default function AdminLibraryOrdersPage() {
 
   const borrowMutation = useConfirmAdminLibraryBorrowMutation();
   const returnMutation = useConfirmAdminLibraryReturnMutation();
+  const cancelOrderMutation = useCancelAdminLibraryOrderMutation();
   const respondSuggestionMutation = useRespondAdminLibrarySuggestionMutation();
 
   const orderItems = ordersQuery.data?.items || [];
@@ -185,6 +188,24 @@ export default function AdminLibraryOrdersPage() {
     }
   };
 
+  const handleCancelOrder = async (orderId) => {
+    const adminNote = window.prompt('Alasan pembatalan (opsional):', '') ?? '';
+    setActingId(orderId);
+
+    try {
+      const response = await cancelOrderMutation.mutateAsync({
+        orderId,
+        payload: { admin_note: adminNote },
+      });
+      toast.success(response?.message || 'Pesanan berhasil dibatalkan.');
+      await ordersQuery.refetch();
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'Gagal membatalkan pesanan.'));
+    } finally {
+      setActingId(null);
+    }
+  };
+
   const handleOpenDetailUsulan = (suggestion) => {
     setSelectedSuggestion(suggestion);
     setSuggestionDetailOpen(true);
@@ -266,14 +287,24 @@ export default function AdminLibraryOrdersPage() {
           </Link>
 
           {row.status === 'ordered' ? (
-            <PrimaryButton
-              type="button"
-              className="h-auto rounded-[8px] bg-[#015023] px-3 py-1.5 text-[12px] font-bold text-white transition hover:opacity-90 shadow-sm"
-              onClick={() => handleConfirmBorrow(row.id_book_order)}
-              disabled={actingId === row.id_book_order || borrowMutation.isPending || returnMutation.isPending}
-            >
-              <CheckCheck className="w-3.5 h-3.5" /> Konfirmasi
-            </PrimaryButton>
+            <>
+              <PrimaryButton
+                type="button"
+                className="h-auto rounded-[8px] bg-[#015023] px-3 py-1.5 text-[12px] font-bold text-white transition hover:opacity-90 shadow-sm"
+                onClick={() => handleConfirmBorrow(row.id_book_order)}
+                disabled={actingId === row.id_book_order || borrowMutation.isPending || returnMutation.isPending || cancelOrderMutation.isPending}
+              >
+                <CheckCheck className="w-3.5 h-3.5" /> Konfirmasi
+              </PrimaryButton>
+              <button
+                type="button"
+                className="flex items-center gap-1.5 rounded-[8px] bg-[#dc2626] px-3 py-1.5 text-[12px] font-bold text-white transition hover:opacity-90 shadow-sm"
+                onClick={() => handleCancelOrder(row.id_book_order)}
+                disabled={actingId === row.id_book_order || borrowMutation.isPending || returnMutation.isPending || cancelOrderMutation.isPending}
+              >
+                <Ban className="w-3.5 h-3.5" /> Batalkan
+              </button>
+            </>
           ) : null}
 
           {row.status === 'borrowed' ? (
@@ -281,7 +312,7 @@ export default function AdminLibraryOrdersPage() {
               type="button"
               className="h-auto rounded-[8px] bg-[#015023] px-3 py-1.5 text-[12px] font-bold text-white transition hover:opacity-90 shadow-sm"
               onClick={() => handleConfirmReturn(row.id_book_order)}
-              disabled={actingId === row.id_book_order || borrowMutation.isPending || returnMutation.isPending}
+              disabled={actingId === row.id_book_order || borrowMutation.isPending || returnMutation.isPending || cancelOrderMutation.isPending}
             >
               <CheckCheck className="w-3.5 h-3.5" /> Kembalikan
             </PrimaryButton>
