@@ -3,11 +3,13 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import {
+  AlertTriangle,
   ArrowLeft,
   CheckCircle2,
   ChevronRight,
   Clock3,
   RefreshCcw,
+  XCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import Navbar from '@/components/ui/navigation-menu';
@@ -80,9 +82,10 @@ function mapKrsItemToCourse(item) {
 
 /**
  * Status keseluruhan halaman diturunkan dari kumpulan entri KRS:
- *  - ada pending  → 'pending'
- *  - semua selesai & ada approved → 'approved'
- *  - lainnya (mis. semua rejected) → 'approved' bucket dilewati; pakai 'pending' fallback
+ *  - ada pending  → 'pending' (masih ada yang perlu ditinjau)
+ *  - ada rejected → 'rejected' (ada penolakan yang perlu ditindaklanjuti mahasiswa,
+ *    diprioritaskan di atas approved agar alasan penolakan tidak terlewat)
+ *  - semua approved → 'approved'
  */
 function deriveOverallStatus(courses = []) {
   if (courses.length === 0) {
@@ -91,6 +94,10 @@ function deriveOverallStatus(courses = []) {
 
   if (courses.some((course) => course.status === 'pending')) {
     return 'pending';
+  }
+
+  if (courses.some((course) => course.status === 'rejected')) {
+    return 'rejected';
   }
 
   if (courses.some((course) => course.status === 'approved')) {
@@ -143,6 +150,31 @@ function getStatusMeta(status) {
         color: '#16A34A',
         backgroundColor: '#E8F8EE',
         border: '1px solid #5BC98A',
+      },
+    };
+  }
+
+  if (status === 'rejected') {
+    return {
+      badgeLabel: 'Ditolak',
+      badgeStyle: {
+        color: '#BE0414',
+        backgroundColor: '#FEE2E2',
+        border: '1px solid #FCA5A5',
+      },
+      cardBorder: '#FCA5A5',
+      cardBackground: '#FEF2F2',
+      iconBackground: '#FEE2E2',
+      iconColor: '#BE0414',
+      title: 'KRS Ditolak',
+      description: 'Sebagian atau seluruh mata kuliah yang Anda ajukan ditolak. Periksa alasan penolakan di bawah, lalu ajukan ulang KRS.',
+      actionLabel: 'Ajukan Ulang',
+      actionColor: '#BE0414',
+      rowStatusLabel: 'Ditolak',
+      rowStatusStyle: {
+        color: '#BE0414',
+        backgroundColor: '#FEE2E2',
+        border: '1px solid #FCA5A5',
       },
     };
   }
@@ -229,6 +261,11 @@ export default function KrsStatusPage() {
 
   const totalSks = useMemo(() => calculateTotalSks(courses), [courses]);
 
+  const rejectedCourses = useMemo(
+    () => courses.filter((course) => course.status === 'rejected'),
+    [courses],
+  );
+
   const normalizedStatus = deriveOverallStatus(courses);
   const statusMeta = getStatusMeta(normalizedStatus);
 
@@ -287,13 +324,20 @@ export default function KrsStatusPage() {
     status: (value, item) => {
       if (value === 'rejected') {
         return (
-          <span
-            className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-base font-semibold"
-            style={{ color: '#BE0414', backgroundColor: '#FEE2E2', border: '1px solid #FCA5A5' }}
-            title={item?.rejection_reason || undefined}
-          >
-            Ditolak
-          </span>
+          <div className="flex flex-col items-center gap-1">
+            <span
+              className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-base font-semibold"
+              style={{ color: '#BE0414', backgroundColor: '#FEE2E2', border: '1px solid #FCA5A5' }}
+            >
+              <XCircle size={14} />
+              Ditolak
+            </span>
+            {item?.rejection_reason && (
+              <span className="text-xs leading-snug" style={{ color: '#BE0414', maxWidth: 200 }}>
+                {item.rejection_reason}
+              </span>
+            )}
+          </div>
         );
       }
 
@@ -394,6 +438,8 @@ export default function KrsStatusPage() {
                 >
                   {normalizedStatus === 'approved' ? (
                     <CheckCircle2 size={30} style={{ color: statusMeta.iconColor }} />
+                  ) : normalizedStatus === 'rejected' ? (
+                    <XCircle size={30} style={{ color: statusMeta.iconColor }} />
                   ) : (
                     <Clock3 size={30} style={{ color: statusMeta.iconColor }} />
                   )}
@@ -403,7 +449,7 @@ export default function KrsStatusPage() {
                   <h2 className="text-2xl font-bold" style={{ color: statusMeta.iconColor }}>
                     {statusMeta.title}
                   </h2>
-                  <p className="text-lg mt-1" style={{ color: normalizedStatus === 'approved' ? '#16A34A' : '#5C9BD5' }}>
+                  <p className="text-lg mt-1" style={{ color: statusMeta.iconColor }}>
                     {statusMeta.description}
                   </p>
                   <p className="text-2xl font-bold mt-2" style={{ color: statusMeta.iconColor }}>
@@ -429,8 +475,48 @@ export default function KrsStatusPage() {
                   {isRefreshing ? 'Memeriksa...' : statusMeta.actionLabel}
                 </Button>
               )}
+
+              {normalizedStatus === 'rejected' && (
+                <Button asChild className="h-11 px-6 text-base font-semibold" style={{ backgroundColor: statusMeta.actionColor }}>
+                  <Link href="/krsmahasiswa/pilih">{statusMeta.actionLabel}</Link>
+                </Button>
+              )}
             </div>
           </section>
+
+          {rejectedCourses.length > 0 && (
+            <section
+              className="mb-5 p-5 lg:p-6 border shadow-sm"
+              style={{ borderRadius: '18px', borderColor: '#FCA5A5', backgroundColor: '#FEF2F2', fontFamily: 'Urbanist, sans-serif' }}
+            >
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#FEE2E2' }}>
+                  <AlertTriangle size={20} style={{ color: '#BE0414' }} />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-bold" style={{ color: '#BE0414' }}>
+                    {rejectedCourses.length} Mata Kuliah Ditolak
+                  </h3>
+                  <p className="text-sm mt-1" style={{ color: '#7F1D1D' }}>
+                    Berikut alasan penolakan dari Dosen Pembimbing Akademik. Silakan perbaiki lalu ajukan ulang KRS.
+                  </p>
+                  <ul className="mt-3 space-y-2">
+                    {rejectedCourses.map((course) => (
+                      <li key={course.id_krs} className="rounded-xl p-3 bg-white border" style={{ borderColor: '#FCA5A5' }}>
+                        <p className="text-sm font-semibold" style={{ color: '#1F2937' }}>
+                          {course.nama_mk}
+                          <span className="font-normal" style={{ color: '#6B7280' }}> · Kelas {course.kode_kelas}</span>
+                        </p>
+                        <p className="text-sm mt-1" style={{ color: '#BE0414' }}>
+                          Alasan: {course.rejection_reason || 'Tidak ada alasan yang diberikan.'}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </section>
+          )}
 
           <section
             className="bg-white overflow-hidden mb-5 border shadow-md"
