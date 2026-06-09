@@ -316,7 +316,7 @@ export default function AdminDashboard() {
   return (
     <div className="min-h-screen flex flex-col">
       {/* Admin Navbar */}
-      <AdminNavbar title="Dashboard Admin" showBack={false} />
+      <AdminNavbar title="Dashboard Admin" />
 
       {/* Main Content */}
       <main className="flex-1 bg-brand-light-sage">

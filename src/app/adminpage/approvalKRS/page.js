@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import {
+  ArrowLeft,
   BookOpen,
   Clock,
   CheckCircle2,
@@ -140,6 +141,18 @@ export default function ApprovalKRSPage() {
 
       <main className="flex-1" style={{ backgroundColor: '#F1F5F0' }}>
         <div className="max-w-7xl mx-auto p-4 sm:p-6">
+
+          {/* Back button */}
+          <div className="mb-4">
+            <button
+              onClick={() => router.push('/adminpage')}
+              className="flex items-center gap-2 text-sm font-medium hover:opacity-80 transition"
+              style={{ color: '#015023' }}
+            >
+              <ArrowLeft className="w-5 h-5" />
+              Kembali ke Dashboard
+            </button>
+          </div>
 
           {/* Page header */}
           <div className="mb-6">

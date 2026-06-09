@@ -11,7 +11,7 @@ import { correspondenceService } from '@/types/correspondence';
 import { useRouter } from 'next/navigation';
 import AdminNavbar from '@/components/ui/admin-navbar';
 import Footer from '@/components/ui/footer';
-import { RefreshCw } from 'lucide-react';
+import { ArrowLeft, RefreshCw } from 'lucide-react';
 
 const font: React.CSSProperties = { fontFamily: 'Urbanist, sans-serif' };
 
@@ -133,6 +133,18 @@ export default function AdminDetailSuratPage({
             <main className="flex-1" style={{ backgroundColor: '#F5F7F5' }}>
                 <div className="p-6">
                     <div className="max-w-7xl mx-auto">
+                        {/* Back button */}
+                        <div className="mb-4">
+                            <button
+                                onClick={() => router.push('/adminpage/persuratan')}
+                                className="flex items-center gap-2 text-sm font-medium hover:opacity-80 transition cursor-pointer"
+                                style={{ color: '#015023' }}
+                            >
+                                <ArrowLeft className="w-5 h-5" />
+                                Kembali ke Persuratan
+                            </button>
+                        </div>
+
                         {/* ── Loading ──────────────────────────── */}
                         {isLoading && <PageSkeleton />}
 
