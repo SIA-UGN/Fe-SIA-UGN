@@ -92,10 +92,20 @@ api.interceptors.response.use(
 
     const serverData = error?.response?.data;
     const validationMessage = getFirstValidationMessage(serverData?.errors);
-    const serverMessage =
+    let serverMessage =
       validationMessage ||
       serverData?.message ||
       serverData?.error;
+
+    if (!serverMessage && error?.response?.status) {
+      if (error.response.status === 401) {
+        serverMessage = "Sesi habis atau tidak terautentikasi, silakan login ulang.";
+      } else if (error.response.status === 403) {
+        serverMessage = "Akses ditolak: Role tidak mencukupi untuk aksi ini.";
+      } else {
+        serverMessage = `HTTP Error: ${error.response.status}`;
+      }
+    }
 
     if (serverMessage) {
       error.message = serverMessage;

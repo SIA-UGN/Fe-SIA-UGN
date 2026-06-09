@@ -11,6 +11,8 @@ import { ErrorMessageBoxWithButton } from '@/components/ui/message-box';
 import { cancelLibraryActivity, getLibraryActivities } from '@/lib/libraryApi';
 import { formatDateTime, getErrorMessage, parseListData } from '@/features/library/utils';
 
+const MAX_ACTIVE_BOOKS = 5;
+
 export default function LibraryActivitiesPage() {
   const [activities, setActivities] = useState([]);
   const [statusFilter, setStatusFilter] = useState('');
@@ -78,6 +80,29 @@ export default function LibraryActivitiesPage() {
       }
     >
       {error ? <ErrorMessageBoxWithButton message={error} action={fetchActivities} /> : null}
+
+      {/* Active book count banner */}
+      {!loading && activities.length > 0 ? (() => {
+        const activeCount = activities.filter(
+          (a) => a.status === 'ordered' || a.status === 'borrowed'
+        ).length;
+        if (activeCount === 0) return null;
+        const hasReachedLimit = activeCount >= MAX_ACTIVE_BOOKS;
+        return (
+          <div
+            className={`mb-4 rounded-[12px] border px-4 py-3 text-[13px] font-medium ${
+              hasReachedLimit
+                ? 'border-[#fecaca] bg-[#fef2f2] text-[#dc2626]'
+                : 'border-[#d1e7dd] bg-[#e8f5e9] text-[#015023]'
+            }`}
+            style={{ fontFamily: 'Urbanist, sans-serif' }}
+          >
+            {hasReachedLimit
+              ? `Anda sudah meminjam/memesan ${activeCount} dari ${MAX_ACTIVE_BOOKS} buku. Kembalikan buku terlebih dahulu sebelum memesan buku baru.`
+              : `Buku aktif (dipesan/dipinjam): ${activeCount}/${MAX_ACTIVE_BOOKS}`}
+          </div>
+        );
+      })() : null}
 
       <section className="overflow-hidden rounded-[16px] bg-white shadow-sm">
         <div className="overflow-x-auto">

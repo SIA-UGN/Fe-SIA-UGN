@@ -75,6 +75,15 @@ export const cancelLibraryActivity = async (activityId) => {
   }
 };
 
+export const returnLibraryBook = async (activityId) => {
+  try {
+    const response = await api.patch(`/library/activities/${activityId}/return`);
+    return response.data;
+  } catch (error) {
+    requestError(error);
+  }
+};
+
 export const getLibrarySuggestions = async (params = {}) => {
   try {
     const response = await api.get('/library/suggestions', { params: buildParams(params) });
@@ -254,6 +263,7 @@ const LibraryApi = {
   getLibraryActivities,
   getLibraryActivityById,
   cancelLibraryActivity,
+  returnLibraryBook,
   getLibrarySuggestions,
   createLibrarySuggestion,
   getAdminLibraryDashboard,

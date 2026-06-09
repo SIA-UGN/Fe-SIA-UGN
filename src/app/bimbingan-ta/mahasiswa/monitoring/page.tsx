@@ -39,7 +39,14 @@ export default function MonitoringBimbinganPage() {
           setJadwalBimbingan(sortedSchedules.map(item => ({
             id: item.id_schedule || item.id || Math.random(),
             tanggal: formatDate(item.date, 'short'),
-            waktu: `${formatTime(item.date)} - Selesai`,
+            waktu: item.time_display || (() => {
+              // Fallback: use start_time/end_time if available
+              const start = item.start_time ? String(item.start_time).slice(0, 5) : null;
+              const end = item.end_time ? String(item.end_time).slice(0, 5) : null;
+              if (start && end) return `${start} - ${end}`;
+              if (start) return `${start} - Selesai`;
+              return '-';
+            })(),
             tempat: item.location || item.place || '-',
             topik: item.topic || item.title || '-',
             status: new Date(item.date) > new Date() ? 'Akan Datang' : 'Selesai'

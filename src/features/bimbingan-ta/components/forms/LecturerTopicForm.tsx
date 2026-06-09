@@ -44,8 +44,7 @@ export default function LecturerTopicForm({
   onSubmit,
   onCancel,
 }: LecturerTopicFormProps) {
-  const [selectedSubjectId, setSelectedSubjectId] = useState('');
-  
+
   const {
     register,
     handleSubmit,
@@ -76,28 +75,11 @@ export default function LecturerTopicForm({
       id_program: initialValues?.id_program ? String(initialValues.id_program) : '',
       id_thesis_category: initialValues?.id_thesis_category ? String(initialValues.id_thesis_category) : '',
     });
-    setSelectedSubjectId('');
   }, [initialValues, reset]);
 
   const selectedTopic = watch('topic');
 
-  const handleSubjectChange = (value: string) => {
-    setSelectedSubjectId(value);
 
-    if (!value) {
-      return;
-    }
-
-    const selectedSubject = subjects.find((subject) => String(subject.id_subject) === value);
-    if (!selectedSubject) {
-      return;
-    }
-
-    // Jika input topic masih kosong, otomatis isi dengan nama mata kuliah
-    if (!selectedTopic) {
-      setValue('topic', selectedSubject.name_subject, { shouldDirty: true, shouldValidate: true });
-    }
-  };
 
   const submit = handleSubmit(async (values) => {
     await onSubmit({
@@ -119,32 +101,12 @@ export default function LecturerTopicForm({
         </div>
       ) : null}
 
-      {/* Dropdown Mata Kuliah Helper */}
-      {subjects.length > 0 ? (
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-          <label className="mb-2 block text-sm font-semibold text-[#015023]">Referensi Mata Kuliah (Opsional)</label>
-          <p className="mb-3 text-sm text-gray-600">
-            Pilih mata kuliah untuk membantu mengisi bidang/topik yang akan dipakai pada judul TA.
-          </p>
-          <select
-            value={selectedSubjectId}
-            onChange={(event) => handleSubjectChange(event.target.value)}
-            className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-[#015023]"
-          >
-            <option value="">-- Pilih Mata Kuliah --</option>
-            {subjects.map((subject) => (
-              <option key={subject.id_subject} value={subject.id_subject}>
-                {(subject.code_subject || `MK-${subject.id_subject}`) + ' - ' + subject.name_subject}
-              </option>
-            ))}
-          </select>
-        </div>
-      ) : null}
+
 
       {/* Warning Messages */}
       {programs.length === 0 ? (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
-          Data program studi belum tersedia. Pastikan program studi ditambahkan terlebih dahulu.
+          Data program studi belum tersedia.
         </div>
       ) : null}
       {categories.length === 0 ? (

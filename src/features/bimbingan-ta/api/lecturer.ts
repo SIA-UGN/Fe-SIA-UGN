@@ -291,25 +291,30 @@ export const lecturerThesisApi = {
 
   async getSubjects() {
     try {
-      const response = await getSubjects();
-      const rawList = Array.isArray(response?.data)
-        ? response.data
-        : Array.isArray(response?.data?.data)
-          ? response.data.data
-          : Array.isArray(response)
-            ? response
-            : Array.isArray(response?.data)
-              ? response.data
-              : [];
+      let normalizedFromManager: any[] = [];
+      try {
+        const response = await getSubjects();
+        const rawList = Array.isArray(response?.data)
+          ? response.data
+          : Array.isArray(response?.data?.data)
+            ? response.data.data
+            : Array.isArray(response)
+              ? response
+              : Array.isArray(response?.data)
+                ? response.data
+                : [];
 
-      const normalizedFromManager = rawList
-        .map((subject) => ({
-          id_subject: Number(subject?.id_subject || subject?.id),
-          name_subject: subject?.name_subject || subject?.name || '',
-          code_subject: subject?.code_subject || subject?.code || null,
-          sks: Number(subject?.sks || 0) || null,
-        }))
-        .filter((subject) => Number.isFinite(subject.id_subject) && subject.name_subject);
+        normalizedFromManager = rawList
+          .map((subject) => ({
+            id_subject: Number(subject?.id_subject || subject?.id),
+            name_subject: subject?.name_subject || subject?.name || '',
+            code_subject: subject?.code_subject || subject?.code || null,
+            sks: Number(subject?.sks || 0) || null,
+          }))
+          .filter((subject) => Number.isFinite(subject.id_subject) && subject.name_subject);
+      } catch (_managerError) {
+        // Ignored, proceed to fallback
+      }
 
       if (normalizedFromManager.length > 0) {
         return normalizedFromManager;

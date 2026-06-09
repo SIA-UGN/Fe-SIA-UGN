@@ -104,35 +104,59 @@ export default function DosenRequestDetailPage() {
             </div>
           </ThesisSectionCard>
 
-          <ThesisSectionCard
-            title="Keputusan"
-            description="Persetujuan akan menambah mahasiswa ke daftar bimbingan. Penolakan wajib menyertakan alasan."
-          >
-            <div className="space-y-4">
-              <textarea
-                value={rejectionNote}
-                onChange={(event) => setRejectionNote(event.target.value)}
-                rows={4}
-                placeholder="Alasan penolakan (wajib saat reject)"
-                className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-[#015023]"
-              />
-              <div className="flex flex-wrap gap-3">
-                <Button variant="primary" disabled={isSubmitting || request.status !== 'pending'} onClick={handleApprove}>
-                  {isSubmitting ? 'Memproses...' : 'Setujui'}
-                </Button>
-                <Button
-                  variant="warning"
-                  disabled={isSubmitting || request.status !== 'pending' || !rejectionNote.trim()}
-                  onClick={handleReject}
-                >
-                  {isSubmitting ? 'Memproses...' : 'Tolak'}
-                </Button>
-                <Button variant="outline" onClick={() => router.push('/bimbingan-ta/dosen/permintaan')}>
-                  Kembali ke Daftar
-                </Button>
+          {request.status === 'pending' ? (
+            <ThesisSectionCard
+              title="Keputusan"
+              description="Persetujuan akan menambah mahasiswa ke daftar bimbingan. Penolakan wajib menyertakan alasan."
+            >
+              <div className="space-y-4">
+                <textarea
+                  value={rejectionNote}
+                  onChange={(event) => setRejectionNote(event.target.value)}
+                  rows={4}
+                  placeholder="Alasan penolakan (wajib saat reject)"
+                  className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-[#015023]"
+                />
+                <div className="flex flex-wrap gap-3">
+                  <Button variant="primary" disabled={isSubmitting} onClick={handleApprove}>
+                    {isSubmitting ? 'Memproses...' : 'Setujui'}
+                  </Button>
+                  <Button
+                    variant="warning"
+                    disabled={isSubmitting || !rejectionNote.trim()}
+                    onClick={handleReject}
+                  >
+                    {isSubmitting ? 'Memproses...' : 'Tolak'}
+                  </Button>
+                  <Button variant="outline" onClick={() => router.push('/bimbingan-ta/dosen/permintaan')}>
+                    Kembali ke Daftar
+                  </Button>
+                </div>
               </div>
-            </div>
-          </ThesisSectionCard>
+            </ThesisSectionCard>
+          ) : (
+            <ThesisSectionCard
+              title="Keputusan Akhir"
+              description={`Permintaan ini telah ${request.status === 'accepted' ? 'disetujui' : 'ditolak'}.`}
+            >
+              <div className="space-y-4">
+                {request.status === 'rejected' && rejectionNote ? (
+                  <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                    <p className="text-sm font-semibold text-gray-700 mb-1">Alasan Penolakan:</p>
+                    <p className="text-sm text-gray-600">{rejectionNote}</p>
+                  </div>
+                ) : null}
+                <div className="flex flex-wrap gap-3">
+                  <Button variant={request.status === 'accepted' ? "primary" : "warning"} disabled>
+                    {request.status === 'accepted' ? 'Sudah Disetujui' : 'Sudah Ditolak'}
+                  </Button>
+                  <Button variant="outline" onClick={() => router.push('/bimbingan-ta/dosen/permintaan')}>
+                    Kembali ke Daftar
+                  </Button>
+                </div>
+              </div>
+            </ThesisSectionCard>
+          )}
         </div>
       ) : null}
     </StudentThesisShell>

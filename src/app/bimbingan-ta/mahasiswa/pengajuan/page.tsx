@@ -100,7 +100,7 @@ export default function MahasiswaThesisSubmissionPage() {
   const requestGuardMessage = useMemo(() => {
     if (!thesis) return 'Pengajuan TA belum tersedia untuk mengajukan pembimbing.';
     if (thesis.status !== 'proposing') {
-      return 'Permintaan pembimbing hanya dapat diajukan saat status TA masih proposing.';
+      return `Permintaan pembimbing tidak dapat diajukan karena status TA sudah ${thesis.status}.`;
     }
     if (activeRequestCount >= 4) {
       return 'Anda sudah mencapai batas maksimal 4 permintaan pembimbing aktif.';
@@ -277,8 +277,8 @@ export default function MahasiswaThesisSubmissionPage() {
                   <div className="mt-5 space-y-4">
                     <p className="text-sm text-gray-600">{thesis.description || 'Tidak ada deskripsi.'}</p>
                     <ThesisAttachmentLink path={thesis.attachment_proposal} label="Buka proposal aktif" />
-                    <p className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
-                      Pengajuan hanya dapat diubah saat status masih <strong>proposing</strong>.
+                    <p className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+                      Status pengajuan Anda saat ini sudah <strong>{thesis.status}</strong>. Pengajuan tidak dapat diubah lagi.
                     </p>
                   </div>
                 )}

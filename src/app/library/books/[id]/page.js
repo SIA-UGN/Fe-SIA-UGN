@@ -10,8 +10,10 @@ import BookIconTile from '@/components/library/book-icon-tile';
 import LibraryStockBadge from '@/components/library/library-stock-badge';
 import { PrimaryButton } from '@/components/ui/button';
 import { ErrorMessageBoxWithButton } from '@/components/ui/message-box';
-import { getLibraryBookById, orderLibraryBook } from '@/lib/libraryApi';
-import { formatDateTime, getErrorMessage, parseApiBody } from '@/features/library/utils';
+import { getLibraryBookById, orderLibraryBook, getLibraryActivities } from '@/lib/libraryApi';
+import { formatDateTime, getErrorMessage, parseApiBody, parseListData } from '@/features/library/utils';
+
+const MAX_ACTIVE_BOOKS = 5;
 
 export default function LibraryBookDetailPage() {
   const params = useParams();
@@ -21,6 +23,8 @@ export default function LibraryBookDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [ordering, setOrdering] = useState(false);
+  const [activeBookCount, setActiveBookCount] = useState(0);
+  const [loadingActivities, setLoadingActivities] = useState(true);
 
   const fetchBook = useCallback(async () => {
     if (!bookId) return;
@@ -40,12 +44,35 @@ export default function LibraryBookDetailPage() {
     }
   }, [bookId]);
 
+  const fetchActiveBookCount = useCallback(async () => {
+    setLoadingActivities(true);
+    try {
+      const response = await getLibraryActivities();
+      const activities = parseListData(response);
+      const activeCount = activities.filter(
+        (a) => a.status === 'ordered' || a.status === 'borrowed'
+      ).length;
+      setActiveBookCount(activeCount);
+    } catch (_err) {
+      // If we can't fetch activities, don't block ordering
+      setActiveBookCount(0);
+    } finally {
+      setLoadingActivities(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchBook();
-  }, [fetchBook]);
+    fetchActiveBookCount();
+  }, [fetchBook, fetchActiveBookCount]);
 
   const handleOrder = async () => {
     if (!book?.id_book) return;
+
+    if (activeBookCount >= MAX_ACTIVE_BOOKS) {
+      toast.error(`Anda sudah meminjam/memesan ${MAX_ACTIVE_BOOKS} buku. Kembalikan buku terlebih dahulu sebelum memesan buku baru.`);
+      return;
+    }
 
     setOrdering(true);
 
@@ -53,6 +80,7 @@ export default function LibraryBookDetailPage() {
       const response = await orderLibraryBook(book.id_book);
       toast.success(response?.message || 'Buku berhasil dipesan.');
       await fetchBook();
+      await fetchActiveBookCount();
     } catch (err) {
       toast.error(getErrorMessage(err, 'Gagal memesan buku.'));
     } finally {
@@ -61,6 +89,8 @@ export default function LibraryBookDetailPage() {
   };
 
   const isAvailable = Boolean(book?.is_available) && Number(book?.available_stock || 0) > 0;
+  const hasReachedLimit = activeBookCount >= MAX_ACTIVE_BOOKS;
+  const canOrder = isAvailable && !hasReachedLimit;
 
   return (
     <LibraryShell
@@ -141,14 +171,36 @@ export default function LibraryBookDetailPage() {
               </p>
             </div>
 
+            {/* Active book limit info */}
+            {!loadingActivities && activeBookCount > 0 ? (
+              <div
+                className={`rounded-[12px] border px-4 py-3 text-[13px] ${
+                  hasReachedLimit
+                    ? 'border-[#fecaca] bg-[#fef2f2] text-[#dc2626]'
+                    : 'border-[#d1e7dd] bg-[#e8f5e9] text-[#015023]'
+                }`}
+                style={{ fontFamily: 'Urbanist, sans-serif' }}
+              >
+                {hasReachedLimit
+                  ? `Anda sudah meminjam/memesan ${activeBookCount} dari ${MAX_ACTIVE_BOOKS} buku. Kembalikan buku terlebih dahulu sebelum memesan buku baru.`
+                  : `Buku aktif Anda: ${activeBookCount}/${MAX_ACTIVE_BOOKS}`}
+              </div>
+            ) : null}
+
             <PrimaryButton
               type="button"
               className="h-11 w-full text-[20px] font-semibold md:w-[260px]"
-              disabled={!isAvailable || ordering}
+              disabled={!canOrder || ordering}
               onClick={handleOrder}
-              style={!isAvailable ? { backgroundColor: '#c6ccd7', color: '#6b7280' } : undefined}
+              style={!canOrder ? { backgroundColor: '#c6ccd7', color: '#6b7280' } : undefined}
             >
-              {ordering ? 'Memproses...' : isAvailable ? 'Pesan Buku' : 'Stok Habis'}
+              {ordering
+                ? 'Memproses...'
+                : hasReachedLimit
+                  ? 'Batas Peminjaman Tercapai'
+                  : isAvailable
+                    ? 'Pesan Buku'
+                    : 'Stok Habis'}
             </PrimaryButton>
           </div>
         </article>

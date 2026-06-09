@@ -1,0 +1,39 @@
+services:
+  nextjs:
+    image: ${NEXTJS_IMAGE:-yourdockeruser/fe-sia-ugn:latest}
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    container_name: fe-sia-ugn-nextjs
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+    ports:
+      - "3000:3000"
+    restart: always
+    networks:
+      - app_net
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: fe-sia-ugn-nginx
+    depends_on:
+      - nextjs
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ./nginx/logs:/var/log/nginx
+    restart: always
+    networks:
+      - app_net
+
+networks:
+  app_net:
+    driver: bridge

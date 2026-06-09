@@ -46,27 +46,15 @@ export default function DosenAddTopicPage() {
       setPrograms(programData);
       setCategories(categoryData);
 
-      // 2. Ambil data Mata Kuliah dari adminApi
+      // 2. Ambil data Mata Kuliah menggunakan API Dosen
       try {
-        const responseSubject = await getSubjects();
-        
-        // Memastikan format response sesuai (biasanya { status: 'success', data: [...] })
-        const subjectList = responseSubject?.status === 'success' ? responseSubject.data : responseSubject;
-        
-        // Mapping data agar sesuai dengan interface SubjectOption (jika diperlukan)
-        if (Array.isArray(subjectList)) {
-            const mappedSubjects = subjectList.map((item: any) => ({
-                id_subject: item.id_subject || item.id,
-                name_subject: item.name_subject || item.name,
-                code_subject: item.code_subject || '',
-                sks: item.sks || 0
-            }));
-            setSubjects(mappedSubjects);
-        } else {
-            setSubjects([]);
-        }
-      } catch (subjectError) {
-        console.error("Gagal mengambil data mata kuliah:", subjectError);
+        const subjectList = await lecturerThesisApi.getSubjects();
+        setSubjects(subjectList);
+      } catch (subjectError: any) {
+        console.error("Gagal mengambil data mata kuliah:");
+        console.error("Type:", typeof subjectError);
+        console.error("Value:", JSON.stringify(subjectError, null, 2));
+        console.error("Message:", subjectError instanceof Error ? subjectError.message : subjectError?.message || subjectError);
         setSubjects([]); // Set array kosong jika gagal agar form tidak error
       }
     } catch (err: any) {
@@ -93,15 +81,15 @@ export default function DosenAddTopicPage() {
     }
   };
 
-  const handleProgramCreated = async (program: ProgramOption) => {
+  const handleProgramCreated = async (subject: SubjectOption) => {
     try {
-      const updatedPrograms = await lecturerThesisApi.resolveProgramOptions();
-      setPrograms(updatedPrograms);
+      const updatedSubjects = await getSubjects();
+      setSubjects(updatedSubjects);
     } catch (err) {
-      if (program && program.id_program) {
-        setPrograms((prev) => {
-          if (prev.some((item) => item.id_program === program.id_program)) return prev;
-          return [...prev, program];
+      if (subjects && subject.id_subject) {
+        setSubjects((prev) => {
+          if (prev.some((item) => item.id_subject === subject.id_subject)) return prev;
+          return [...prev, subject];
         });
       }
     }
@@ -142,6 +130,7 @@ export default function DosenAddTopicPage() {
                   Program Studi
                 </button>
               )}
+
               <button
                 type="button"
                 onClick={() => setShowKategoriModal(true)}

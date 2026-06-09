@@ -76,8 +76,8 @@ export default function AdminFilterBar({
                         onChange={(e) => setFilterCategory(e.target.value)}
                     >
                         <option value="">Semua</option>
-                        {categories.map((cat) => (
-                            <option key={cat.id_category} value={cat.id_category}>
+                        {categories.map((cat, index) => (
+                            <option key={cat.id_category ?? cat.id ?? cat.category_id ?? index} value={cat.id_category ?? cat.id ?? cat.category_id ?? ""}>
                                 {cat.name}
                             </option>
                         ))}
