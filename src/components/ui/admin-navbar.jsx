@@ -4,7 +4,7 @@ import * as React from "react"
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { LogOut, UserCog } from 'lucide-react'
+import { ArrowLeft, LogOut, UserCog } from 'lucide-react'
 import { cn, buildImageUrl } from "@/lib/utils"
 import { logout } from '@/lib/sessionApi';
 import { useAuth } from '@/lib/auth-context';
@@ -70,7 +70,7 @@ className={cn("text-right", className)}
 </div>
 )}
 
-function AdminNavbar({ className = "", title = "Dashboard Admin", userName = null, Name = null, ...props }) {
+function AdminNavbar({ className = "", title = "Dashboard Admin", userName = null, Name = null, showBack = true, ...props }) {
 const router = useRouter()
 const { user, logoutLocal } = useAuth();
 const [showLogoutDialog, setShowLogoutDialog] = React.useState(false);
@@ -135,7 +135,22 @@ return (
   >
     <div className="container mx-auto px-4 sm:px-6">
       <div className="flex justify-between items-center h-16 sm:h-20 transition-all duration-300">
-        <AdminNavbarBrand isScrolled={isScrolled} />
+        <div className="flex items-center gap-1 sm:gap-2">
+          {showBack && (
+            <button
+              type="button"
+              onClick={() => router.back()}
+              aria-label="Kembali ke halaman sebelumnya"
+              title="Kembali"
+              className="flex items-center gap-1.5 rounded-full px-2.5 sm:px-3 py-1.5 text-white/90 hover:text-white hover:bg-white/10 transition-colors focus:outline-none cursor-pointer"
+              style={{ fontFamily: 'Urbanist, sans-serif' }}
+            >
+              <ArrowLeft className="w-5 h-5 shrink-0" />
+              <span className="hidden md:inline text-sm font-semibold">Kembali</span>
+            </button>
+          )}
+          <AdminNavbarBrand isScrolled={isScrolled} />
+        </div>
         <div className="flex items-center gap-3 sm:gap-4">
           <AdminNavbarTitle title={title} />
           
