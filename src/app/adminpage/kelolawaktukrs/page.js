@@ -24,14 +24,11 @@ import {
   AlertDialogContent,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogDescription,
   AlertDialogFooter,
-  AlertDialogCancel,
-  AlertDialogAction,
   AlertErrorDialog,
   AlertSuccessDialog,
 } from '@/components/ui/alert-dialog';
-import { OutlineButton, WarningButton, SuccessButton } from '@/components/ui/button';
+import { OutlineButton, SuccessButton } from '@/components/ui/button';
 import { ErrorMessageBoxWithButton } from '@/components/ui/message-box';
 import {
   getKrsSessions,
@@ -115,8 +112,6 @@ export default function KelolaWaktuKRS() {
   const refetch = () => setRefreshKey((k) => k + 1);
 
   // dialogs
-  const [deleteTarget, setDeleteTarget]   = useState(null);
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showErrorDialog, setShowErrorDialog]   = useState(false);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [dialogMessage, setDialogMessage] = useState('');
@@ -168,37 +163,20 @@ export default function KelolaWaktuKRS() {
   const handleEdit = (session) =>
     router.push(`/adminpage/kelolawaktukrs/editform?id=${session.id}`);
 
-  const handleDeleteClick = (session) => {
-    setDeleteTarget(session);
-    setShowDeleteDialog(true);
-  };
-
-  // Catatan: BE TIDAK punya endpoint hapus sesi. Aksi destruktif sesi yang
-  // tersedia hanya "tutup sesi" (B4) → tombol Hapus & Power di-map ke close.
-  const confirmDelete = async () => {
-    setShowDeleteDialog(false);
-    const target = deleteTarget;
-    setDeleteTarget(null);
-    if (!target) return;
-    const { error: err } = await closeKrsSession(target.id, true);
-    if (err) {
-      setDialogMessage(resolveErrorMessage(err));
-      setShowErrorDialog(true);
-      return;
-    }
-    setDialogMessage(`Sesi "${target.name}" berhasil ditutup.`);
-    setShowSuccessDialog(true);
-    refetch();
-  };
-
+  // Catatan: BE TIDAK punya endpoint hapus sesi. Aksi yang tersedia hanya
+  // "tutup sesi" (B4) → tombol Power memetakan ke close. Sesi yang sudah
+  // ditutup tidak dapat dibuka kembali.
   const handleToggleStatus = async (session) => {
-    if (!confirm('Yakin ingin menutup sesi KRS ini?')) return;
+    if (session.status !== 'aktif') return; // hanya sesi aktif yang bisa ditutup
+    if (!confirm('Yakin ingin menutup sesi KRS ini? Setelah ditutup, sesi tidak dapat dibuka kembali.')) return;
     const { error: err } = await closeKrsSession(session.id, true);
     if (err) {
       setDialogMessage(resolveErrorMessage(err));
       setShowErrorDialog(true);
       return;
     }
+    setDialogMessage(`Sesi "${session.name}" berhasil ditutup.`);
+    setShowSuccessDialog(true);
     refetch();
   };
 
@@ -478,9 +456,7 @@ export default function KelolaWaktuKRS() {
                                   '#6B7280',
                               }}
                               title={
-                                session.status === 'aktif'    ? 'Ubah Status' :
-                                session.status === 'nonaktif' ? 'Aktifkan' :
-                                'Selesai'
+                                session.status === 'aktif' ? 'Tutup sesi' : 'Sesi sudah ditutup'
                               }
                             >
                               <Power className="w-4 h-4" />
@@ -493,15 +469,6 @@ export default function KelolaWaktuKRS() {
                               title="Edit sesi"
                             >
                               <Edit className="w-4 h-4" />
-                            </button>
-                            {/* Delete */}
-                            <button
-                              onClick={() => handleDeleteClick(session)}
-                              className="p-2 rounded-xl text-white hover:opacity-80 transition shadow-sm"
-                              style={{ backgroundColor: '#BE0414' }}
-                              title="Hapus sesi"
-                            >
-                              <Trash2 className="w-4 h-4" />
                             </button>
                           </div>
                         </td>
@@ -537,31 +504,19 @@ export default function KelolaWaktuKRS() {
               <span className="w-5 h-5 rounded-lg flex items-center justify-center text-white" style={{ backgroundColor: '#16874B' }}>
                 <Power className="w-3 h-3" />
               </span>
-              <span className="text-gray-600">Aktif → ubah status</span>
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-5 h-5 rounded-lg flex items-center justify-center text-white" style={{ backgroundColor: '#6B7280' }}>
-                <Power className="w-3 h-3" />
-              </span>
-              <span className="text-gray-600">Nonaktif → klik untuk aktifkan</span>
+              <span className="text-gray-600">Aktif → tutup sesi</span>
             </span>
             <span className="flex items-center gap-1.5">
               <span className="w-5 h-5 rounded-lg flex items-center justify-center text-white" style={{ backgroundColor: '#2563EB' }}>
                 <Power className="w-3 h-3" />
               </span>
-              <span className="text-gray-600">Selesai</span>
+              <span className="text-gray-600">Selesai (sudah ditutup)</span>
             </span>
             <span className="flex items-center gap-1.5">
               <span className="w-5 h-5 rounded-lg flex items-center justify-center text-white" style={{ backgroundColor: '#16874B' }}>
                 <Edit className="w-3 h-3" />
               </span>
               <span className="text-gray-600">Edit sesi</span>
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-5 h-5 rounded-lg flex items-center justify-center text-white" style={{ backgroundColor: '#BE0414' }}>
-                <Trash2 className="w-3 h-3" />
-              </span>
-              <span className="text-gray-600">Hapus sesi</span>
             </span>
           </div>
 
@@ -724,56 +679,6 @@ export default function KelolaWaktuKRS() {
 
           <AlertDialogFooter>
             <OutlineButton onClick={handleCloseClassModal}>Tutup</OutlineButton>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* ── Delete Confirmation Dialog ─────────────────────────────────────── */}
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            {/* Icon */}
-            <div className="flex items-center gap-3 mb-1">
-              <div
-                className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
-                style={{ backgroundColor: '#FEE2E2' }}
-              >
-                <Trash2 className="w-5 h-5" style={{ color: '#BE0414' }} />
-              </div>
-              <div>
-                <AlertDialogTitle>Hapus Sesi</AlertDialogTitle>
-                <p className="text-sm text-gray-500 mt-0.5">Konfirmasi Penghapusan</p>
-              </div>
-            </div>
-          </AlertDialogHeader>
-
-          {/* Session info */}
-          {deleteTarget && (
-            <div
-              className="rounded-xl p-4 text-sm space-y-1"
-              style={{ backgroundColor: '#FFF5F5', border: '1px solid #FEC5C5' }}
-            >
-              <p style={{ color: '#015023' }}>
-                <span className="font-semibold">Sesi:</span> {deleteTarget.name}
-              </p>
-              <p style={{ color: '#015023' }}>
-                <span className="font-semibold">Periode:</span>{' '}
-                {formatDate(deleteTarget.start_date)} – {formatDate(deleteTarget.end_date)}
-              </p>
-            </div>
-          )}
-
-          <AlertDialogDescription>
-            Apakah Anda yakin ingin menghapus sesi ini? Data yang terkait dengan sesi ini akan dihapus secara permanen dan tidak dapat dikembalikan.
-          </AlertDialogDescription>
-
-          <AlertDialogFooter>
-            <AlertDialogCancel asChild>
-              <OutlineButton>Batal</OutlineButton>
-            </AlertDialogCancel>
-            <AlertDialogAction asChild>
-              <WarningButton onClick={confirmDelete}>Ya, Hapus</WarningButton>
-            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

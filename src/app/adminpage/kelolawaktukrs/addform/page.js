@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Save, X, Info } from 'lucide-react';
 import AdminNavbar from '@/components/ui/admin-navbar';
@@ -29,11 +29,12 @@ function resolveErrorMessage(err) {
   return err.message || 'Terjadi kesalahan, coba beberapa saat lagi';
 }
 
-const STATUS_OPTIONS = [
-  { value: 'aktif',    label: 'Aktif' },
-  { value: 'nonaktif', label: 'Nonaktif' },
-  { value: 'selesai',  label: 'Selesai' },
-];
+function formatPeriodDate(dateStr) {
+  if (!dateStr) return '-';
+  const [y, m, d] = String(dateStr).slice(0, 10).split('-');
+  if (!y || !m || !d) return '-';
+  return `${d}/${m}/${y}`;
+}
 
 export default function TambahSesiKRS() {
   const router = useRouter();
@@ -42,12 +43,36 @@ export default function TambahSesiKRS() {
   const [success, setSuccess]     = useState(null);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
 
+  // Periode akademik di-fetch untuk dropdown (tidak diinput manual).
+  const [periods, setPeriods]             = useState([]);
+  const [periodsLoading, setPeriodsLoading] = useState(true);
+  const [periodsError, setPeriodsError]   = useState(null);
+
   const [formData, setFormData] = useState({
-    name:       '',
-    start_date: '',
-    end_date:   '',
-    status:     '',
+    id_academic_period: '',
+    notes: '',
   });
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      setPeriodsLoading(true);
+      const { data, error } = await getAcademicPeriods();
+      if (!active) return;
+      if (error) {
+        setPeriodsError(resolveErrorMessage(error));
+        setPeriods([]);
+      } else {
+        setPeriods(Array.isArray(data?.data) ? data.data : []);
+      }
+      setPeriodsLoading(false);
+    })();
+    return () => { active = false; };
+  }, []);
+
+  const selectedPeriod = periods.find(
+    (p) => String(p.id_academic_period) === String(formData.id_academic_period)
+  );
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -59,16 +84,7 @@ export default function TambahSesiKRS() {
 
   const validate = () => {
     const errs = {};
-    if (!formData.name.trim()) errs.name = 'Nama sesi harus diisi';
-    else if (formData.name.length < 5) errs.name = 'Nama sesi minimal 5 karakter';
-    if (!formData.start_date) errs.start_date = 'Tanggal mulai harus diisi';
-    if (!formData.end_date)   errs.end_date   = 'Tanggal selesai harus diisi';
-    if (formData.start_date && formData.end_date) {
-      if (new Date(formData.end_date) <= new Date(formData.start_date)) {
-        errs.end_date = 'Tanggal selesai harus setelah tanggal mulai';
-      }
-    }
-    if (!formData.status) errs.status = 'Status awal harus dipilih';
+    if (!formData.id_academic_period) errs.id_academic_period = 'Periode akademik wajib dipilih';
     setErrors(prev => ({ ...prev, ...errs }));
     return Object.keys(errs).length === 0;
   };
@@ -78,40 +94,19 @@ export default function TambahSesiKRS() {
     if (!validate()) return;
     setIsLoading(true);
 
-    // B2 (createKrsSession) wajib id_academic_period. Form tidak punya selector
-    // periode → cocokkan nama sesi dengan periode akademik, fallback periode aktif.
-    const { data: periodsRes, error: pErr } = await getAcademicPeriods();
-    if (pErr) {
-      setErrors(prev => ({ ...prev, form: resolveErrorMessage(pErr) }));
-      setIsLoading(false);
-      return;
-    }
-    const periods = periodsRes?.data ?? [];
-    const match = periods.find(
-      (p) => p.name?.trim().toLowerCase() === formData.name.trim().toLowerCase()
-    );
-    const period = match ?? periods.find((p) => p.is_active);
-    if (!period) {
-      setErrors(prev => ({
-        ...prev,
-        form: 'Periode akademik tidak ditemukan. Buat/aktifkan periode akademik terlebih dahulu.',
-      }));
-      setIsLoading(false);
-      return;
-    }
+    // API POST /manager/krs-sessions hanya butuh id_academic_period (+ notes opsional).
+    // Status sesi otomatis "open", opened_at di-set backend.
+    const payload = { id_academic_period: Number(formData.id_academic_period) };
+    if (formData.notes.trim()) payload.notes = formData.notes.trim();
 
-    // BE sesi tidak menyimpan nama/tanggal/status manual → nama disimpan sebagai notes.
-    const { error: err } = await createKrsSession({
-      id_academic_period: period.id_academic_period,
-      notes: formData.name,
-    });
+    const { error: err } = await createKrsSession(payload);
     if (err) {
       setErrors(prev => ({ ...prev, form: resolveErrorMessage(err) }));
       setIsLoading(false);
       return;
     }
-    setSuccess('Sesi KRS berhasil ditambahkan.');
-    setFormData({ name: '', start_date: '', end_date: '', status: '' });
+    setSuccess('Sesi KRS berhasil ditambahkan dan langsung berstatus Aktif.');
+    setFormData({ id_academic_period: '', notes: '' });
     setIsLoading(false);
   };
 
@@ -140,7 +135,7 @@ export default function TambahSesiKRS() {
                 Tambah Sesi KRS Baru
               </h1>
               <p className="text-gray-500 text-base mt-1">
-                Isi form di bawah untuk menambahkan sesi KRS baru
+                Pilih periode akademik untuk membuka sesi pengisian KRS
               </p>
             </div>
           </div>
@@ -159,152 +154,38 @@ export default function TambahSesiKRS() {
 
             <form onSubmit={handleSubmit} className="space-y-8">
 
-              {/* Nama Sesi */}
+              {/* Periode Akademik (dropdown — fetch dari API) */}
               <Field>
-                <FieldLabel htmlFor="name">
-                  Nama Sesi <span className="text-red-500">*</span>
+                <FieldLabel htmlFor="id_academic_period">
+                  Periode Akademik <span className="text-red-500">*</span>
                 </FieldLabel>
                 <FieldDescription>
-                  Masukkan nama sesi KRS (contoh: Semester Ganjil 2024/2025)
+                  Pilih periode akademik. Sesi akan dibuat untuk periode ini.
                 </FieldDescription>
                 <FieldContent>
                   <div className="relative">
-                    <input
-                      type="text"
-                      id="name"
-                      name="name"
-                      value={formData.name}
-                      onChange={handleChange}
-                      placeholder="e.g. Semester Ganjil 2024/2025"
-                      disabled={isLoading}
-                      className="w-full px-4 py-3.5 border-2 focus:outline-none"
-                      style={{
-                        borderColor: errors.name ? '#BE0414' : '#015023',
-                        borderRadius: '12px',
-                        opacity: errors.name ? 1 : 0.75,
-                        fontFamily: 'Urbanist, sans-serif',
-                      }}
-                    />
-                    {formData.name && !errors.name && formData.name.length >= 5 && (
-                      <div
-                        className="absolute right-4 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold"
-                        style={{ backgroundColor: '#16874B' }}
-                      >
-                        ✓
-                      </div>
-                    )}
-                  </div>
-                </FieldContent>
-                {errors.name && <FieldError>{errors.name}</FieldError>}
-              </Field>
-
-              {/* Tanggal */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Mulai */}
-                <Field>
-                  <FieldLabel htmlFor="start_date">
-                    Tanggal Mulai <span className="text-red-500">*</span>
-                  </FieldLabel>
-                  <FieldDescription>Pilih tanggal pembukaan pengisian KRS</FieldDescription>
-                  <FieldContent>
-                    <div className="relative">
-                      <input
-                        type="date"
-                        id="start_date"
-                        name="start_date"
-                        value={formData.start_date}
-                        onChange={handleChange}
-                        disabled={isLoading}
-                        className="w-full px-4 py-3.5 border-2 focus:outline-none"
-                        style={{
-                          borderColor: errors.start_date ? '#BE0414' : '#015023',
-                          borderRadius: '12px',
-                          opacity: errors.start_date ? 1 : 0.75,
-                          fontFamily: 'Urbanist, sans-serif',
-                        }}
-                      />
-                      {formData.start_date && !errors.start_date && (
-                        <div
-                          className="absolute right-4 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold"
-                          style={{ backgroundColor: '#16874B' }}
-                        >
-                          ✓
-                        </div>
-                      )}
-                    </div>
-                  </FieldContent>
-                  {errors.start_date && <FieldError>{errors.start_date}</FieldError>}
-                </Field>
-
-                {/* Selesai */}
-                <Field>
-                  <FieldLabel htmlFor="end_date">
-                    Tanggal Selesai <span className="text-red-500">*</span>
-                  </FieldLabel>
-                  <FieldDescription>Pilih tanggal penutupan pengisian KRS</FieldDescription>
-                  <FieldContent>
-                    <div className="relative">
-                      <input
-                        type="date"
-                        id="end_date"
-                        name="end_date"
-                        value={formData.end_date}
-                        onChange={handleChange}
-                        disabled={isLoading}
-                        className="w-full px-4 py-3.5 border-2 focus:outline-none"
-                        style={{
-                          borderColor: errors.end_date ? '#BE0414' : '#015023',
-                          borderRadius: '12px',
-                          opacity: errors.end_date ? 1 : 0.75,
-                          fontFamily: 'Urbanist, sans-serif',
-                        }}
-                      />
-                      {formData.end_date && !errors.end_date && (
-                        <div
-                          className="absolute right-4 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold"
-                          style={{ backgroundColor: '#16874B' }}
-                        >
-                          ✓
-                        </div>
-                      )}
-                    </div>
-                  </FieldContent>
-                  {errors.end_date && <FieldError>{errors.end_date}</FieldError>}
-                </Field>
-              </div>
-
-              {/* Separator */}
-              <div
-                className="w-full h-px"
-                style={{ background: 'linear-gradient(to right, transparent, #DABC4E, transparent)' }}
-              />
-
-              {/* Status Awal */}
-              <Field>
-                <FieldLabel htmlFor="status">
-                  Status Awal <span className="text-red-500">*</span>
-                </FieldLabel>
-                <FieldDescription>Status dapat diubah kapan saja dari tabel</FieldDescription>
-                <FieldContent>
-                  <div className="relative">
                     <select
-                      id="status"
-                      name="status"
-                      value={formData.status}
+                      id="id_academic_period"
+                      name="id_academic_period"
+                      value={formData.id_academic_period}
                       onChange={handleChange}
-                      disabled={isLoading}
+                      disabled={isLoading || periodsLoading}
                       className="w-full px-4 py-3.5 border-2 focus:outline-none appearance-none bg-white"
                       style={{
-                        borderColor: errors.status ? '#BE0414' : '#015023',
+                        borderColor: errors.id_academic_period ? '#BE0414' : '#015023',
                         borderRadius: '12px',
-                        opacity: errors.status ? 1 : 0.75,
+                        opacity: errors.id_academic_period ? 1 : 0.75,
                         fontFamily: 'Urbanist, sans-serif',
-                        color: formData.status ? '#1a1a1a' : '#9ca3af',
+                        color: formData.id_academic_period ? '#1a1a1a' : '#9ca3af',
                       }}
                     >
-                      <option value="" disabled>Pilih status awal</option>
-                      {STATUS_OPTIONS.map(opt => (
-                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      <option value="" disabled>
+                        {periodsLoading ? 'Memuat periode akademik...' : 'Pilih periode akademik'}
+                      </option>
+                      {periods.map((p) => (
+                        <option key={p.id_academic_period} value={p.id_academic_period}>
+                          {p.name}{p.is_active ? ' · Aktif' : ''}
+                        </option>
                       ))}
                     </select>
                     {/* Chevron icon */}
@@ -315,7 +196,61 @@ export default function TambahSesiKRS() {
                     </div>
                   </div>
                 </FieldContent>
-                {errors.status && <FieldError>{errors.status}</FieldError>}
+                {errors.id_academic_period && <FieldError>{errors.id_academic_period}</FieldError>}
+                {periodsError && <FieldError>{periodsError}</FieldError>}
+                {!periodsLoading && !periodsError && periods.length === 0 && (
+                  <FieldError>
+                    Belum ada periode akademik. Buat periode akademik terlebih dahulu.
+                  </FieldError>
+                )}
+              </Field>
+
+              {/* Rentang tanggal periode (read-only, dari periode terpilih) */}
+              {selectedPeriod && (
+                <div
+                  className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-xl text-sm"
+                  style={{ backgroundColor: '#F9FAFB', border: '1px solid #E5E7EB' }}
+                >
+                  <div>
+                    <p className="text-xs text-gray-500 mb-0.5">Tanggal Mulai Periode</p>
+                    <p className="font-semibold" style={{ color: '#015023' }}>
+                      {formatPeriodDate(selectedPeriod.start_date)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 mb-0.5">Tanggal Selesai Periode</p>
+                    <p className="font-semibold" style={{ color: '#015023' }}>
+                      {formatPeriodDate(selectedPeriod.end_date)}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Catatan (opsional) */}
+              <Field>
+                <FieldLabel htmlFor="notes">Catatan untuk Mahasiswa (Opsional)</FieldLabel>
+                <FieldDescription>
+                  Instruksi/keterangan yang ditampilkan ke mahasiswa saat pengisian KRS.
+                </FieldDescription>
+                <FieldContent>
+                  <textarea
+                    id="notes"
+                    name="notes"
+                    value={formData.notes}
+                    onChange={handleChange}
+                    placeholder="Contoh: Pendaftaran KRS Semester Genap 2025/2026. Batas waktu 5 hari."
+                    rows={3}
+                    maxLength={1000}
+                    disabled={isLoading}
+                    className="w-full px-4 py-3.5 border-2 focus:outline-none resize-none"
+                    style={{
+                      borderColor: '#015023',
+                      borderRadius: '12px',
+                      opacity: 0.75,
+                      fontFamily: 'Urbanist, sans-serif',
+                    }}
+                  />
+                </FieldContent>
               </Field>
 
               {/* Info note */}
@@ -325,8 +260,9 @@ export default function TambahSesiKRS() {
               >
                 <Info className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: '#015023' }} />
                 <p style={{ color: '#015023' }}>
-                  Mahasiswa hanya dapat mengisi KRS ketika status sesi adalah{' '}
-                  <span className="font-bold">Aktif</span>
+                  Sesi langsung berstatus <span className="font-bold">Aktif</span> setelah dibuat dan
+                  mahasiswa dapat mengisi KRS. Setiap periode hanya boleh memiliki satu sesi aktif.
+                  Sesi ditutup dari tabel daftar sesi.
                 </p>
               </div>
 
@@ -350,7 +286,7 @@ export default function TambahSesiKRS() {
                   <Button
                     type="submit"
                     variant="secondary"
-                    disabled={isLoading}
+                    disabled={isLoading || periodsLoading || periods.length === 0}
                     className="flex-1 sm:flex-none sm:min-w-[160px]"
                     style={{ backgroundColor: '#DABC4E', color: '#015023' }}
                   >
@@ -396,8 +332,9 @@ export default function TambahSesiKRS() {
                   Catatan Penting
                 </h3>
                 <p className="text-sm leading-relaxed" style={{ color: '#015023' }}>
-                  Pastikan rentang tanggal sesi KRS tidak tumpang tindih dengan sesi lain. 
-                  Hanya satu sesi yang bisa berstatus <strong>Aktif</strong> dalam satu waktu.
+                  Setelah sesi dibuat, daftarkan kelas yang boleh dipilih mahasiswa lewat menu
+                  <strong> Kelola Kelas</strong> pada tabel daftar sesi. Hanya satu sesi yang bisa
+                  berstatus <strong>Aktif</strong> per periode akademik.
                 </p>
               </div>
             </div>
