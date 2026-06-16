@@ -1,16 +1,47 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { 
   ArrowLeft, Search, Filter, RefreshCw, Download, 
   CheckCircle, Clock, XCircle, FileText, User, 
-  CreditCard, Calendar, AlertCircle, X
+  CreditCard, Calendar, AlertCircle, X, ChevronDown
 } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import AdminNavbar from '@/components/ui/admin-navbar';
 import Footer from '@/components/ui/footer';
 import DataTable from '@/components/ui/table';
 import { toast } from 'sonner';
+import PaymentDetailModal from '@/app/ukt/PaymentDetailModal';
+import { fetchAdminTuitionPayments } from '@/features/ukt/services/tuitionService';
+
+function FilterDropdown({ value, options, onChange }) {
+  const selectedLabel = options.find(o => o.value === value)?.label || value;
+  
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger className="flex items-center justify-between gap-2 p-2.5 text-xs sm:text-sm border border-gray-200 rounded-lg outline-none hover:border-[#015023] bg-white font-medium text-gray-700 transition-colors w-full text-left">
+        <span className="truncate">{selectedLabel}</span>
+        <ChevronDown className="w-4 h-4 text-gray-400 shrink-0" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="w-56">
+        <DropdownMenuRadioGroup value={value} onValueChange={onChange}>
+          {options.map((opt) => (
+            <DropdownMenuRadioItem key={opt.value} value={opt.value}>
+              {opt.label}
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
 
 export default function AdminUktMonitoringPage() {
   // --- STATE MANAGEMENT ---
@@ -23,106 +54,69 @@ export default function AdminUktMonitoringPage() {
   const [isExporting, setIsExporting] = useState(false);
   
   // State untuk Modal Detail
-  const [selectedTrx, setSelectedTrx] = useState(null);
-  const [isSyncingSingle, setIsSyncingSingle] = useState(false);
+  const [selectedPaymentId, setSelectedPaymentId] = useState(null);
 
-  // --- DUMMY DATA TRANSAKSI UKT MAHASISWA ---
-  const rawData = [
-    {
-      id: 1,
-      id_transaksi: 'TRX-UKT-2026-001',
-      mahasiswa: {
-        nama: 'Dimas Jati Satria',
-        nim: '2022010001',
-        prodi: 'Teknologi Rekayasa Perangkat Lunak'
-      },
-      tingkat_ukt: 3,
-      nominal: 3500000,
-      metode: 'Transfer Bank BNI (VA)',
-      va_number: '98812021010001',
-      waktu_dibuat: '08 Mei 2026, 08:00 WIB',
-      waktu_bayar: '08 Mei 2026, 15:52 WIB',
-      status: 'Lunas'
-    },
-    {
-      id: 2,
-      id_transaksi: 'TRX-UKT-2026-002',
-      mahasiswa: {
-        nama: 'Ahmad Fauzi',
-        nim: '2022010002',
-        prodi: 'Teknologi Rekayasa Perangkat Lunak'
-      },
-      tingkat_ukt: 3,
-      nominal: 3500000,
-      metode: 'Transfer Bank Mandiri (VA)',
-      va_number: '89912021010002',
-      waktu_dibuat: '10 Mei 2026, 10:15 WIB',
-      waktu_bayar: null,
-      status: 'Menunggu'
-    },
-    {
-      id: 3,
-      id_transaksi: 'TRX-UKT-2026-003',
-      mahasiswa: {
-        nama: 'Siti Aminah',
-        nim: '2022010003',
-        prodi: 'Sistem Informasi'
-      },
-      tingkat_ukt: 2,
-      nominal: 2500000,
-      metode: 'Transfer Bank BRI (VA)',
-      va_number: '77712021010003',
-      waktu_dibuat: '05 Mei 2026, 09:00 WIB',
-      waktu_bayar: null,
-      status: 'Expired'
-    },
-    {
-      id: 4,
-      id_transaksi: 'TRX-UKT-2026-004',
-      mahasiswa: {
-        nama: 'Hasan Fahrezi',
-        nim: '2022010004',
-        prodi: 'Teknik Informatika'
-      },
-      tingkat_ukt: 3,
-      nominal: 3500000,
-      metode: 'Transfer Bank BNI (VA)',
-      va_number: '98812021010004',
-      waktu_dibuat: '09 Mei 2026, 11:20 WIB',
-      waktu_bayar: '09 Mei 2026, 14:10 WIB',
-      status: 'Lunas'
-    },
-    {
-      id: 5,
-      id_transaksi: 'TRX-UKT-2026-005',
-      mahasiswa: {
-        nama: 'Resti Dinda',
-        nim: '2022010005',
-        prodi: 'Sistem Informasi'
-      },
-      tingkat_ukt: 4,
-      nominal: 4500000,
-      metode: 'Transfer Bank BCA (VA)',
-      va_number: '10012021010005',
-      waktu_dibuat: '11 Mei 2026, 07:30 WIB',
-      waktu_bayar: null,
-      status: 'Menunggu'
-    },
-  ];
+  // --- STATE DATA ---
+  const [rawData, setRawData] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Map verification_status from API to consistent display labels used in filters
+  const mapVerificationLabel = (verificationLabel) => {
+    if (verificationLabel === 'Disetujui') return 'Disetujui';
+    if (verificationLabel === 'Ditolak') return 'Ditolak';
+    // 'Menunggu Verifikasi' or any other pending-like label → 'Menunggu'
+    return 'Menunggu';
+  };
+
+  const fetchPaymentData = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await fetchAdminTuitionPayments();
+      const mappedData = response.items.map(item => ({
+        id: item.id_tuition_payment,
+        id_transaksi: item.transaction_reference || `PAY-${item.id_tuition_payment}`,
+        mahasiswa: {
+          nama: item.student?.name || 'Unknown',
+          nim: item.student?.nim || '-',
+          prodi: item.student?.program || 'Tidak diketahui'
+        },
+        tingkat_ukt: '-', 
+        nominal: item.amount_paid,
+        metode: item.payment_method || '-',
+        waktu_dibuat: item.uploaded_at ? new Date(item.uploaded_at).toLocaleString('id-ID') : '-',
+        waktu_bayar: item.verified_at ? new Date(item.verified_at).toLocaleString('id-ID') : null,
+        status: mapVerificationLabel(item.verification_label)
+      }));
+      setRawData(mappedData);
+      return mappedData.length;
+    } catch (err) {
+      setError(err.message || 'Gagal mengambil data UKT');
+      console.error(err);
+      return 0;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchPaymentData();
+  }, [fetchPaymentData]);
 
   // --- STATISTIK REKAPITULASI (Dihitung dari data) ---
   const stats = useMemo(() => {
     const total = rawData.length;
-    const lunas = rawData.filter(i => i.status === 'Lunas').length;
+    const disetujui = rawData.filter(i => i.status === 'Disetujui').length;
     const menunggu = rawData.filter(i => i.status === 'Menunggu').length;
-    const expired = rawData.filter(i => i.status === 'Expired').length;
+    const ditolak = rawData.filter(i => i.status === 'Ditolak').length;
     
     const totalNominal = rawData.reduce((acc, curr) => acc + curr.nominal, 0);
-    const nominalLunas = rawData.filter(i => i.status === 'Lunas').reduce((acc, curr) => acc + curr.nominal, 0);
+    const nominalLunas = rawData.filter(i => i.status === 'Disetujui').reduce((acc, curr) => acc + curr.nominal, 0);
     
     return {
-      total, lunas, menunggu, expired, totalNominal, nominalLunas,
-      pctLunas: Math.round((lunas / total) * 100) || 0
+      total, disetujui, menunggu, ditolak, totalNominal, nominalLunas,
+      pctLunas: Math.round((disetujui / (total || 1)) * 100)
     };
   }, [rawData]);
 
@@ -142,6 +136,28 @@ export default function AdminUktMonitoringPage() {
     });
   }, [rawData, searchQuery, filterProdi, filterStatus, filterTingkat]);
 
+  // --- OPSI FILTER ---
+  const prodiOptions = [
+    { value: 'Semua', label: 'Semua Program Studi' },
+    { value: 'Teknologi Rekayasa Perangkat Lunak', label: 'TRPL' },
+    { value: 'Sistem Informasi', label: 'Sistem Informasi' },
+    { value: 'Teknik Informatika', label: 'Teknik Informatika' },
+  ];
+
+  const tingkatOptions = [
+    { value: 'Semua', label: 'Semua Golongan UKT' },
+    { value: 'Tingkat 2', label: 'Tingkat 2' },
+    { value: 'Tingkat 3', label: 'Tingkat 3' },
+    { value: 'Tingkat 4', label: 'Tingkat 4' },
+  ];
+
+  const statusOptions = [
+    { value: 'Semua', label: 'Semua Status' },
+    { value: 'Disetujui', label: 'Disetujui' },
+    { value: 'Menunggu', label: 'Menunggu' },
+    { value: 'Ditolak', label: 'Ditolak' },
+  ];
+
   // --- HELPERS ---
   const formatRupiah = (angka) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
@@ -151,32 +167,9 @@ export default function AdminUktMonitoringPage() {
   const handleSyncMassal = async () => {
     setIsSyncingAll(true);
     toast.loading('Melakukan rekonsiliasi status massal ke Payment Gateway...', { id: 'sync-all' });
-    await new Promise(resolve => setTimeout(resolve, 2500));
-    toast.success('Sinkronisasi selesai! 12 tagihan diperbarui.', { id: 'sync-all' });
+    const count = await fetchPaymentData();
+    toast.success(`Sinkronisasi selesai! ${count} tagihan diperbarui.`, { id: 'sync-all' });
     setIsSyncingAll(false);
-  };
-
-  const handleExportLaporan = async () => {
-    setIsExporting(true);
-    toast.loading('Mengekspor laporan UKT ke format Excel...', { id: 'export' });
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    toast.success('Laporan berhasil diunduh!', { id: 'export' });
-    setIsExporting(false);
-  };
-
-  const handleSyncSingleTrx = async (idTrx) => {
-    setIsSyncingSingle(true);
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    toast.success(`Status transaksi ${idTrx} tersinkronisasi dengan bank.`);
-    setIsSyncingSingle(false);
-  };
-
-  const handleBatalkanTrx = (idTrx) => {
-    const confirm = window.confirm(`Apakah Anda yakin ingin membatalkan tagihan ${idTrx} secara manual?`);
-    if (confirm) {
-      toast.success(`Transaksi ${idTrx} berhasil dibatalkan.`);
-      setSelectedTrx(null);
-    }
   };
 
   // --- CONFIG TABEL ---
@@ -213,29 +206,29 @@ export default function AdminUktMonitoringPage() {
       <span className="text-sm font-extrabold text-[#015023]">{formatRupiah(val)}</span>
     ),
     status: (val) => {
-      if (val === 'Lunas') {
+      if (val === 'Disetujui') {
         return (
           <div className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-green-50 text-green-600 border border-green-200 text-xs font-bold">
-            <CheckCircle className="w-3 h-3" /> Lunas
+            <CheckCircle className="w-3 h-3" /> Disetujui
           </div>
         );
       }
-      if (val === 'Expired') {
+      if (val === 'Menunggu') {
         return (
-          <div className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-red-50 text-red-600 border border-red-200 text-xs font-bold">
-            <XCircle className="w-3 h-3" /> Expired
+          <div className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-orange-50 text-orange-600 border border-orange-200 text-xs font-bold animate-pulse">
+            <Clock className="w-3 h-3" /> Menunggu
           </div>
         );
       }
       return (
-        <div className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-yellow-50 text-yellow-600 border border-yellow-200 text-xs font-bold">
-          <Clock className="w-3 h-3" /> Menunggu
+        <div className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-red-50 text-red-600 border border-red-200 text-xs font-bold">
+          <XCircle className="w-3 h-3" /> {val}
         </div>
       );
     },
     aksi: (val, item) => (
       <button 
-        onClick={() => setSelectedTrx(item)}
+        onClick={() => setSelectedPaymentId(item.id)}
         className="bg-[#015023] hover:bg-[#013d1b] text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-colors shadow-sm"
       >
         Detail
@@ -279,15 +272,6 @@ export default function AdminUktMonitoringPage() {
                 <RefreshCw className={`w-4 h-4 ${isSyncingAll ? 'animate-spin' : ''}`} />
                 {isSyncingAll ? 'Menyinkronkan...' : 'Sinkronisasi'}
               </button>
-
-              <button 
-                onClick={handleExportLaporan}
-                disabled={isExporting}
-                className="flex items-center gap-2 bg-[#DABC4E] text-[#015023] hover:bg-[#c9aa3f] font-bold px-4 py-2.5 rounded-xl text-sm transition-all shadow-sm disabled:opacity-70"
-              >
-                <Download className="w-4 h-4" />
-                {isExporting ? 'Mengekspor...' : 'Ekspor Laporan'}
-              </button>
             </div>
           </div>
 
@@ -314,7 +298,7 @@ export default function AdminUktMonitoringPage() {
               </div>
               <div>
                 <p className="text-xs text-green-200 font-semibold">Lunas (Verified)</p>
-                <p className="text-2xl font-bold mt-1 text-green-400">{stats.lunas}</p>
+                <p className="text-2xl font-bold mt-1 text-green-400">{stats.disetujui}</p>
                 <span className="text-[10px] text-green-300">Terbayar</span>
               </div>
               <div>
@@ -324,7 +308,7 @@ export default function AdminUktMonitoringPage() {
               </div>
               <div>
                 <p className="text-xs text-green-200 font-semibold">Gagal / Expired</p>
-                <p className="text-2xl font-bold mt-1 text-red-400">{stats.expired}</p>
+                <p className="text-2xl font-bold mt-1 text-red-400">{stats.ditolak}</p>
                 <span className="text-[10px] text-red-200">Hangus</span>
               </div>
             </div>
@@ -360,38 +344,21 @@ export default function AdminUktMonitoringPage() {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full sm:w-auto flex-1">
-                <select 
+                <FilterDropdown 
                   value={filterProdi} 
-                  onChange={(e) => setFilterProdi(e.target.value)}
-                  className="p-2.5 text-xs sm:text-sm border border-gray-200 rounded-lg outline-none focus:border-[#015023] bg-white font-medium text-gray-700"
-                >
-                  <option value="Semua">Semua Program Studi</option>
-                  <option value="Teknologi Rekayasa Perangkat Lunak">TRPL</option>
-                  <option value="Sistem Informasi">Sistem Informasi</option>
-                  <option value="Teknik Informatika">Teknik Informatika</option>
-                </select>
-
-                <select 
+                  onChange={setFilterProdi} 
+                  options={prodiOptions} 
+                />
+                <FilterDropdown 
                   value={filterTingkat} 
-                  onChange={(e) => setFilterTingkat(e.target.value)}
-                  className="p-2.5 text-xs sm:text-sm border border-gray-200 rounded-lg outline-none focus:border-[#015023] bg-white font-medium text-gray-700"
-                >
-                  <option value="Semua">Semua Golongan UKT</option>
-                  <option value="Tingkat 2">Tingkat 2</option>
-                  <option value="Tingkat 3">Tingkat 3</option>
-                  <option value="Tingkat 4">Tingkat 4</option>
-                </select>
-
-                <select 
+                  onChange={setFilterTingkat} 
+                  options={tingkatOptions} 
+                />
+                <FilterDropdown 
                   value={filterStatus} 
-                  onChange={(e) => setFilterStatus(e.target.value)}
-                  className="p-2.5 text-xs sm:text-sm border border-gray-200 rounded-lg outline-none focus:border-[#015023] bg-white font-medium text-gray-700"
-                >
-                  <option value="Semua">Semua Status Gateway</option>
-                  <option value="Lunas">Lunas</option>
-                  <option value="Menunggu">Menunggu</option>
-                  <option value="Expired">Expired</option>
-                </select>
+                  onChange={setFilterStatus} 
+                  options={statusOptions} 
+                />
               </div>
             </div>
 
@@ -404,135 +371,27 @@ export default function AdminUktMonitoringPage() {
               data={filteredData}
               customRender={customRender}
               pagination={true}
+              itemsPerPage={10}
+              isLoading={isLoading}
             />
+            {error && (
+              <div className="p-4 text-center text-sm font-bold text-red-500 bg-red-50 border-t border-red-100">
+                {error}
+              </div>
+            )}
           </div>
 
         </div>
       </main>
 
+      {/* Gunakan PaymentDetailModal untuk Admin */}
+      <PaymentDetailModal 
+        paymentId={selectedPaymentId} 
+        onClose={() => setSelectedPaymentId(null)} 
+        isAdmin={true} 
+      />
+
       <Footer />
-
-      {/* ========================================= */}
-      {/* MODAL POP-UP DETAIL TRANSAKSI & LOG GATEWAY*/}
-      {/* ========================================= */}
-      {selectedTrx && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200 font-urbanist">
-          <div className="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
-            
-            {/* Modal Header */}
-            <div className="bg-[#015023] px-6 py-4 flex justify-between items-center text-white">
-              <div className="flex items-center gap-2">
-                <FileText className="w-5 h-5 text-[#DABC4E]" />
-                <h3 className="font-bold text-base">Rincian & Log Gateway</h3>
-              </div>
-              <button 
-                onClick={() => setSelectedTrx(null)}
-                className="text-gray-300 hover:text-white p-1"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Modal Body (Scrollable) */}
-            <div className="p-6 overflow-y-auto flex-1 flex flex-col gap-6 bg-gray-50/30">
-              
-              {/* Info Mahasiswa */}
-              <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex items-center gap-4">
-                <div className="w-12 h-12 rounded-full bg-[#015023] text-white flex items-center justify-center font-bold text-base">
-                  {selectedTrx.mahasiswa.nama.split(' ').map(n => n[0]).join('').substring(0, 2)}
-                </div>
-                <div>
-                  <h4 className="font-extrabold text-gray-900 text-base">{selectedTrx.mahasiswa.nama}</h4>
-                  <p className="text-xs text-gray-500 font-medium">{selectedTrx.mahasiswa.nim} &bull; {selectedTrx.mahasiswa.prodi}</p>
-                  <span className="inline-block mt-1 text-xs font-bold text-[#015023] bg-green-50 px-2 py-0.5 rounded border border-green-100">
-                    UKT Tingkat {selectedTrx.tingkat_ukt}
-                  </span>
-                </div>
-              </div>
-
-              {/* Rincian Transaksi */}
-              <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-                <div className="px-4 py-3 bg-gray-50 font-bold text-xs text-gray-600 border-b border-gray-100 uppercase tracking-wider flex items-center gap-2">
-                  <CreditCard className="w-4 h-4 text-[#015023]" /> Data Payment Gateway
-                </div>
-                
-                <div className="p-4 flex flex-col divide-y divide-gray-50 text-xs sm:text-sm">
-                  <div className="py-2.5 flex justify-between items-center">
-                    <span className="text-gray-500">Order ID / Ref</span>
-                    <span className="font-mono font-bold text-gray-800">{selectedTrx.id_transaksi}</span>
-                  </div>
-                  <div className="py-2.5 flex justify-between items-center">
-                    <span className="text-gray-500">Metode VA</span>
-                    <span className="font-bold text-gray-800">{selectedTrx.metode}</span>
-                  </div>
-                  <div className="py-2.5 flex justify-between items-center">
-                    <span className="text-gray-500">Nomor Virtual Account</span>
-                    <span className="font-mono font-bold text-blue-700 tracking-wider bg-blue-50 px-2 py-1 rounded">
-                      {selectedTrx.va_number}
-                    </span>
-                  </div>
-                  <div className="py-2.5 flex justify-between items-center">
-                    <span className="text-gray-500">Nominal Tagihan</span>
-                    <span className="font-extrabold text-[#015023] text-base">{formatRupiah(selectedTrx.nominal)}</span>
-                  </div>
-                  <div className="py-2.5 flex justify-between items-center">
-                    <span className="text-gray-500">Waktu VA Dibuat</span>
-                    <span className="font-medium text-gray-800">{selectedTrx.waktu_dibuat}</span>
-                  </div>
-                  <div className="py-2.5 flex justify-between items-center">
-                    <span className="text-gray-500">Waktu Terbayar</span>
-                    <span className="font-medium text-gray-800">{selectedTrx.waktu_bayar || '-'}</span>
-                  </div>
-                  <div className="py-2.5 flex justify-between items-center">
-                    <span className="text-gray-500">Status Gateway</span>
-                    {customRender.status(selectedTrx.status)}
-                  </div>
-                </div>
-              </div>
-
-              {/* Log / Peringatan */}
-              <div className="bg-[#fef8e6] border border-[#fdeeb5] rounded-xl p-4 flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 text-orange-600 shrink-0 mt-0.5" />
-                <div className="text-xs text-orange-900 leading-relaxed font-medium">
-                  <span className="font-bold block mb-0.5">Catatan Sistem:</span>
-                  Sistem mengecek status transaksi ini secara berkala melalui webhook. Jika uang sudah masuk di bank namun status masih "Menunggu", gunakan tombol sinkronisasi manual di bawah.
-                </div>
-              </div>
-
-            </div>
-
-            {/* Modal Footer Actions */}
-            <div className="p-4 bg-white border-t border-gray-100 flex flex-col sm:flex-row justify-between gap-3">
-              <button 
-                onClick={() => handleBatalkanTrx(selectedTrx.id_transaksi)}
-                disabled={selectedTrx.status === 'Lunas'}
-                className="px-4 py-2 text-xs font-bold text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-40 disabled:hover:bg-transparent text-left sm:text-center"
-              >
-                Batalkan Tagihan Manual
-              </button>
-
-              <div className="flex items-center justify-end gap-2">
-                <button 
-                  onClick={() => setSelectedTrx(null)}
-                  className="px-4 py-2 text-xs font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-                >
-                  Tutup
-                </button>
-                <button 
-                  onClick={() => handleSyncSingleTrx(selectedTrx.id_transaksi)}
-                  disabled={isSyncingSingle}
-                  className="px-4 py-2 text-xs font-bold text-white bg-[#015023] hover:bg-[#013d1b] rounded-lg transition-colors flex items-center gap-1.5 shadow-sm disabled:opacity-70"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${isSyncingSingle ? 'animate-spin' : ''}`} />
-                  {isSyncingSingle ? 'Mengecek...' : 'Cek Status Gateway'}
-                </button>
-              </div>
-            </div>
-
-          </div>
-        </div>
-      )}
-
     </div>
   );
 }

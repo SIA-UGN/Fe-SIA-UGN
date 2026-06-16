@@ -57,6 +57,15 @@ export default function LibraryBooksPage() {
   const currentPage = meta.current_page || 1;
   const lastPage = meta.last_page || 1;
 
+  // Debounce search input
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setAppliedSearch(searchInput.trim());
+      setMeta((prev) => ({ ...prev, current_page: 1 }));
+    }, 400);
+    return () => clearTimeout(handler);
+  }, [searchInput]);
+
   const pageNumbers = useMemo(
     () => buildPageNumbers(currentPage, lastPage),
     [currentPage, lastPage],
@@ -107,11 +116,6 @@ export default function LibraryBooksPage() {
     fetchBooks();
   }, [fetchBooks]);
 
-  const applySearch = () => {
-    setMeta((prev) => ({ ...prev, current_page: 1 }));
-    setAppliedSearch(searchInput.trim());
-  };
-
   const handleOrder = async (book) => {
     if (!book?.id_book) return;
 
@@ -158,22 +162,8 @@ export default function LibraryBooksPage() {
               placeholder="Cari berdasarkan judul.."
               value={searchInput}
               onChange={(event) => setSearchInput(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') {
-                  event.preventDefault();
-                  applySearch();
-                }
-              }}
             />
           </div>
-          <PrimaryButton
-            type="button"
-            className="h-11 min-w-[140px] text-[14px] font-semibold"
-            onClick={applySearch}
-          >
-            <Filter className="h-4 w-4" />
-            Filter Judul
-          </PrimaryButton>
         </div>
 
         <div className="mt-4 flex flex-wrap gap-2">

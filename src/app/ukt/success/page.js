@@ -55,13 +55,13 @@ export default function UktSuccessPage() {
   const transaction = paymentData ? {
     idTransaksi: paymentData.id_tuition_payment?.toString() ?? 'TRX-Unknown',
     nominal: paymentData.tuition_fee?.final_amount ?? paymentData.amount_paid ?? 0,
-    waktuPembayaran: paymentData.verified_date ? new Date(paymentData.verified_date).toLocaleDateString('id-ID', { month: 'long', day: 'numeric', year: 'numeric' }) : '-',
-    status: paymentData.status === 'verified' ? 'Lunas' : 'Pending'
+    waktuPembayaran: paymentData.verified_at ? new Date(paymentData.verified_at).toLocaleDateString('id-ID', { month: 'long', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-',
+    status: paymentData.verification_status === 'verified' ? 'Lunas' : paymentData.verification_status === 'rejected' ? 'Ditolak' : 'Menunggu Verifikasi'
   } : {
-    idTransaksi: 'TRX-1778229571883',
-    nominal: 3500000,
-    waktuPembayaran: '8 Mei 2026 pukul 15.52 WIB',
-    status: 'Lunas'
+    idTransaksi: 'TRX-Unknown',
+    nominal: 0,
+    waktuPembayaran: '-',
+    status: 'Memuat...'
   };
 
   // --- ALUR PEMBAYARAN (STEPPER) ---
@@ -215,7 +215,13 @@ export default function UktSuccessPage() {
                   </div>
                   <div className="flex items-center justify-between py-4 border-b border-gray-100">
                     <span className="text-sm font-medium text-gray-500">Status</span>
-                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-50 text-green-600 border border-green-200 text-xs font-bold">
+                    <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${
+                      transaction.status === 'Lunas' 
+                        ? 'bg-green-50 text-green-600 border border-green-200'
+                        : transaction.status === 'Ditolak'
+                          ? 'bg-red-50 text-red-600 border border-red-200'
+                          : 'bg-orange-50 text-orange-600 border border-orange-200'
+                    }`}>
                       <CheckCircle className="w-3.5 h-3.5" /> {transaction.status}
                     </div>
                   </div>

@@ -60,6 +60,35 @@ export function getStatusLabel(status: string) {
   );
 }
 
+export function isConsultationFinished(consultation: any) {
+  if (consultation?.status === 'finished') return true;
+  if (!consultation?.consultation_date) return false;
+
+  const now = new Date();
+  const [year, month, day] = consultation.consultation_date.split('-');
+  
+  let endHour = 23;
+  let endMin = 59;
+  
+  if (consultation.end_time) {
+     const [h, m] = consultation.end_time.split(':');
+     endHour = parseInt(h, 10);
+     endMin = parseInt(m, 10);
+  } else if (consultation.start_time) {
+     const [h, m] = consultation.start_time.split(':');
+     endHour = parseInt(h, 10) + 1; // assume 1 hour duration if no end_time
+     endMin = parseInt(m, 10);
+  }
+
+  const endDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), endHour, endMin);
+  return now > endDate;
+}
+
+export function getDerivedConsultationStatus(consultation: any): ConsultationStatus {
+  if (!consultation) return 'on_going';
+  return isConsultationFinished(consultation) ? 'finished' : (consultation.status as ConsultationStatus || 'on_going');
+}
+
 export function getStatusTone(status: string): StatusTone {
   return statusToneMap[status] || 'slate';
 }

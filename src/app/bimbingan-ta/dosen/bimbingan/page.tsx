@@ -10,7 +10,7 @@ import ThesisLoadingBlock from '@/features/bimbingan-ta/components/ThesisLoading
 import ThesisSectionCard from '@/features/bimbingan-ta/components/ThesisSectionCard';
 import ThesisStatusBadge from '@/features/bimbingan-ta/components/ThesisStatusBadge';
 import { lecturerThesisApi } from '@/features/bimbingan-ta/api/lecturer';
-import { formatDate } from '@/features/bimbingan-ta/utils';
+import { formatDate, getDerivedConsultationStatus } from '@/features/bimbingan-ta/utils';
 import { getErrorMessage } from '@/features/library/utils';
 import api from '@/lib/axios';
 import type { ThesisSupervisor } from '@/features/bimbingan-ta/types';
@@ -82,10 +82,19 @@ export default function DosenSuperviseesPage() {
     return supervisees.filter((item) => {
       const studentName = item?.student_thesis?.student?.name || '';
       const nim = item?.student_thesis?.student?.username || '';
-      const title = item?.student_thesis?.title_ind || '';
-      return [studentName, nim, title].some((value) =>
+      const titleInd = item?.student_thesis?.title_ind || '';
+      const titleEng = item?.student_thesis?.title_eng || '';
+      const programName = item?.student_thesis?.program?.name || '';
+
+      const textMatch = [studentName, nim, titleInd, titleEng, programName].some((value) =>
         String(value).toLowerCase().includes(query),
       );
+
+      const consultationMatch = (item?.consultations || []).some((c: any) =>
+        String(c?.subject || '').toLowerCase().includes(query)
+      );
+
+      return textMatch || consultationMatch;
     });
   }, [search, supervisees]);
 
@@ -245,7 +254,7 @@ export default function DosenSuperviseesPage() {
                               <p className="text-sm text-gray-600">{formatDate(consultation.consultation_date)}</p>
                             </div>
                             <div className="flex flex-wrap gap-2">
-                              <ThesisStatusBadge status={consultation.status} />
+                              <ThesisStatusBadge status={getDerivedConsultationStatus(consultation)} />
                               <Button variant="outline" asChild>
                                 <Link href={`/bimbingan-ta/dosen/konsultasi/${consultation.id_consultation}/edit`}>Edit</Link>
                               </Button>

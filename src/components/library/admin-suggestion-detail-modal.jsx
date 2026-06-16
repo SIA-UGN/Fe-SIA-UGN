@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
-import { BookOpen, Check, X } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { BookOpen, Check, X, BookPlus } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { formatDate } from '@/features/library/utils';
 
 export default function AdminSuggestionDetailModal({
@@ -12,7 +13,14 @@ export default function AdminSuggestionDetailModal({
   onReject,
   submitting = false,
 }) {
+  const router = useRouter();
   const [adminResponse, setAdminResponse] = useState('');
+
+  useEffect(() => {
+    if (open) {
+      setAdminResponse('');
+    }
+  }, [open, suggestion]);
 
   if (!open || !suggestion) return null;
 
@@ -92,12 +100,12 @@ export default function AdminSuggestionDetailModal({
           </div>
 
           {/* Admin response (if already responded) */}
-          {suggestion.admin_response ? (
+          {!isPending ? (
             <div className="mt-4">
               <p className="text-[13px] font-bold text-[#101828]">Respon Admin</p>
               <div className="mt-2 rounded-[12px] bg-[#e8f5e9] px-4 py-3">
                 <p className="text-[14px] leading-relaxed text-[#015023]">
-                  {suggestion.admin_response}
+                  {suggestion.admin_response && suggestion.admin_response !== '-' ? suggestion.admin_response : '-'}
                 </p>
               </div>
             </div>
@@ -140,7 +148,24 @@ export default function AdminSuggestionDetailModal({
               </button>
             </div>
           ) : (
-            <div className="mt-5">
+            <div className="mt-5 flex flex-col gap-3">
+              {suggestion.status === 'approved' && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const params = new URLSearchParams({
+                      addBook: 'true',
+                      title: suggestion.title || '',
+                      author: suggestion.author || ''
+                    });
+                    router.push(`/adminpage/perpustakaan?${params.toString()}`);
+                  }}
+                  className="flex h-[44px] w-full items-center justify-center gap-2 rounded-[10px] bg-[#015023] text-[15px] font-semibold text-white transition-colors hover:bg-[#013d1a]"
+                >
+                  <BookPlus className="h-4 w-4" />
+                  Jadikan Buku Katalog
+                </button>
+              )}
               <button
                 type="button"
                 onClick={onClose}

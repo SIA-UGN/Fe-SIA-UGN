@@ -45,6 +45,7 @@ export default function AdminFilterBar({
     filterDateTo,
     setFilterDateTo,
     clearFilters,
+    statuses, // prop baru
 }) {
     const hasActiveFilters = filterCategory || filterStatus || filterDateFrom || filterDateTo;
 
@@ -75,7 +76,7 @@ export default function AdminFilterBar({
                         value={filterCategory}
                         onChange={(e) => setFilterCategory(e.target.value)}
                     >
-                        <option value="">Semua</option>
+                        <option value="all">Semua</option>
                         {categories.map((cat, index) => (
                             <option key={cat.id_category ?? cat.id ?? cat.category_id ?? index} value={cat.id_category ?? cat.id ?? cat.category_id ?? ""}>
                                 {cat.name}
@@ -94,11 +95,19 @@ export default function AdminFilterBar({
                         value={filterStatus}
                         onChange={(e) => setFilterStatus(e.target.value)}
                     >
-                        <option value="">Semua</option>
-                        <option value="submitted">Diajukan</option>
-                        <option value="process">Diproses</option>
-                        <option value="resolved">Selesai</option>
-                        <option value="rejected">Ditolak</option>
+                        <option value="all">Semua</option>
+                        {statuses ? (
+                            statuses.map((st, i) => (
+                                <option key={i} value={st.value}>{st.label}</option>
+                            ))
+                        ) : (
+                            <>
+                                <option value="submitted">Diajukan</option>
+                                <option value="process">Diproses</option>
+                                <option value="resolved">Selesai</option>
+                                <option value="rejected">Ditolak</option>
+                            </>
+                        )}
                     </select>
                 </div>
 

@@ -132,7 +132,7 @@ export default function LibrarySuggestionsPage() {
       {error ? <ErrorMessageBoxWithButton message={error} action={fetchSuggestions} /> : null}
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-[2fr_1fr]">
-        <section className="rounded-[16px] bg-white p-5 shadow-sm md:p-6">
+        <section className="h-fit rounded-[16px] bg-white p-5 shadow-sm md:p-6">
           <header className="mb-4 flex items-start gap-3">
             <div className="rounded-[10px] bg-[#015023] p-2.5 text-white">
               <SendHorizontal className="h-5 w-5" />
@@ -252,7 +252,7 @@ export default function LibrarySuggestionsPage() {
               </p>
             ) : null}
 
-            <div className="space-y-3">
+            <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
               {sortedSuggestions.map((item) => (
                 <article key={item.id_book_suggestion} className="rounded-[12px] border border-[#e5e7eb] p-3">
                   <h4 className="text-[15px] font-semibold text-[#015023]" style={{ fontFamily: 'Urbanist, sans-serif' }}>

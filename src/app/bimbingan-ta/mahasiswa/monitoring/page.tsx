@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import Navbar from '@/components/ui/navigation-menu';
 import Footer from '@/components/ui/footer';
+import Link from 'next/link';
 import { getThesisMonitoringData } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 
@@ -150,9 +151,9 @@ export default function MonitoringBimbinganPage() {
           {/* Breadcrumbs */}
           <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-500 mb-8">
             <Home className="w-4 h-4" />
-            <span className="hover:text-[#015023] cursor-pointer transition-colors">Beranda</span>
+            <Link href="/dashboard" className="hover:text-[#015023] cursor-pointer transition-colors">Beranda</Link>
             <ChevronRight className="w-3 h-3" />
-            <span className="hover:text-[#015023] cursor-pointer transition-colors">Bimbingan</span>
+            <Link href="/bimbingan-ta/mahasiswa/pengajuan" className="hover:text-[#015023] cursor-pointer transition-colors">Bimbingan</Link>
             <ChevronRight className="w-3 h-3" />
             <span className="font-bold text-[#015023]">Monitoring</span>
           </div>

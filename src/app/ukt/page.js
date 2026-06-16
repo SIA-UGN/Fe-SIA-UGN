@@ -10,18 +10,15 @@ import Navbar from '@/components/ui/navigation-menu';
 import Footer from '@/components/ui/footer';
 import { toast } from 'sonner';
 import { fetchStudentTuitionBills, fetchStudentPaymentHistory } from '@/features/ukt/services/tuitionService';
+import PaymentDetailModal from './PaymentDetailModal';
 
 export default function StudentUktMainPage() {
-
-  // --- STATE UNTUK BULK SELECTION ---
-  const [selectedIds, setSelectedIds] = useState([]);
-  const [isDownloadingBulk, setIsDownloadingBulk] = useState(false);
-
   // --- STATE UNTUK DATA & LOADING ---
   const [bills, setBills] = useState([]);
   const [paymentHistory, setPaymentHistory] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [selectedPaymentId, setSelectedPaymentId] = useState(null);
 
   // --- FETCH DATA ---
   const fetchData = useCallback(async () => {
@@ -72,13 +69,21 @@ export default function StudentUktMainPage() {
   }, [bills]);
 
   const riwayatPembayaran = useMemo(() => {
-    return paymentHistory.map(item => ({
-      id: item.id,
-      semester: item.academic_period ?? '-',
-      tahun: item.academic_period?.match(/\d{4}\/\d{4}/) ?? '-',
-      nominal: item.amount_paid,
-      status: item.verification_label ?? 'Disetujui'
-    }));
+    return paymentHistory.map(item => {
+      const tahunMatch = item.academic_period?.match(/\d{4}\/\d{4}/);
+      return {
+        ...item,
+        id: item.id,
+        semester: item.academic_period ?? '-',
+        tahun: tahunMatch ? tahunMatch[0] : '-',
+        nominal: item.amount_paid,
+        status: item.verification_label ?? 'Disetujui',
+        method: item.payment_method ?? '-',
+        tanggal: item.uploaded_at ? new Date(item.uploaded_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : '-',
+        rejectionReason: item.rejection_reason,
+        adminNotes: item.admin_notes
+      };
+    });
   }, [paymentHistory]);
 
   const alurPembayaran = [
@@ -92,35 +97,6 @@ export default function StudentUktMainPage() {
   const formatRupiah = (angka) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
   };
-
-  // --- LOGIKA SELECTION ---
-  const handleSelectAll = (e) => {
-    if (e.target.checked) {
-      setSelectedIds(riwayatPembayaran.map(item => item.id));
-    } else {
-      setSelectedIds([]);
-    }
-  };
-
-  const handleSelectRow = (id) => {
-    setSelectedIds(prev => 
-      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
-    );
-  };
-
-  const handleBulkDownload = async () => {
-    if (selectedIds.length === 0) return;
-
-    setIsDownloadingBulk(true);
-    toast.loading(`Menyiapkan ${selectedIds.length} kwitansi dalam format ZIP...`, { id: 'bulk-load' });
-
-    // Simulasi proses kompresi di backend
-    await new Promise(resolve => setTimeout(resolve, 2000));
-
-    toast.success('Batch kwitansi berhasil diunduh!', { id: 'bulk-load' });
-    setIsDownloadingBulk(false);
-    setSelectedIds([]); // Reset pilihan setelah unduh
-  };
   
 return (
     <div className="min-h-screen flex flex-col bg-[#f4f7f5] font-urbanist">
@@ -131,9 +107,9 @@ return (
         {/* --- BREADCRUMBS --- */}
         <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-500 mb-8">
           <Home className="w-4 h-4" />
-          <span className="hover:text-[#015023] cursor-pointer transition-colors">Beranda</span>
+          <Link href="/dashboard" className="hover:text-[#015023] cursor-pointer transition-colors">Beranda</Link>
           <ChevronRight className="w-3 h-3" />
-          <span className="hover:text-[#015023] cursor-pointer transition-colors">Administrasi</span>
+          <span className="text-gray-500">Administrasi</span>
           <ChevronRight className="w-3 h-3" />
           <span className="font-bold text-[#015023]">UKT</span>
         </div>
@@ -242,66 +218,25 @@ return (
             {!isLoading && !error && <div>
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
                 <h2 className="text-xl font-bold text-[#015023]">Riwayat Pembayaran</h2>
-                
-                {/* Tombol Bulk Download Dinamis (Muncul jika ada yg di-checklist) */}
-                {selectedIds.length > 0 && (
-                  <div className="flex items-center gap-3 animate-in fade-in slide-in-from-right-4">
-                    <span className="text-sm font-medium text-gray-500">
-                      <span className="font-bold text-[#015023]">{selectedIds.length}</span> dipilih
-                    </span>
-                    <button 
-                      onClick={handleBulkDownload}
-                      disabled={isDownloadingBulk}
-                      className="flex items-center gap-2 px-4 py-2 bg-[#DABC4E] text-[#015023] rounded-xl text-sm font-bold shadow-sm hover:bg-[#c9aa3f] transition-all disabled:opacity-70"
-                    >
-                      {isDownloadingBulk ? <RefreshCw className="w-4 h-4 animate-spin" /> : <FileStack className="w-4 h-4" />}
-                      Unduh Terpilih (.zip)
-                    </button>
-                    <button 
-                      onClick={() => setSelectedIds([])}
-                      className="p-2 text-gray-400 hover:text-red-500 transition-colors"
-                    >
-                      <X className="w-5 h-5" />
-                    </button>
-                  </div>
-                )}
               </div>
               
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto overflow-y-auto max-h-[380px]">
                   <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="bg-gray-50/50 border-b border-gray-100 text-xs font-bold text-gray-500 uppercase tracking-wider">
-                        {/* Kolom Checkbox Header */}
-                        <th className="py-4 px-6 w-10">
-                          <input 
-                            type="checkbox" 
-                            className="w-4 h-4 rounded border-gray-300 text-[#015023] focus:ring-[#015023] cursor-pointer"
-                            onChange={handleSelectAll}
-                            checked={selectedIds.length === riwayatPembayaran.length && riwayatPembayaran.length > 0}
-                          />
-                        </th>
-                        <th className="py-4 px-6">Semester</th>
-                        <th className="py-4 px-6">Nominal</th>
-                        <th className="py-4 px-6">Status</th>
-                        <th className="py-4 px-6 text-right">Aksi</th>
+                    <thead className="sticky top-0 z-10">
+                      <tr className="bg-gray-50 border-b border-gray-100 text-xs font-bold text-gray-500 uppercase tracking-wider">
+                        <th className="py-4 px-6 bg-gray-50">Semester</th>
+                        <th className="py-4 px-6 bg-gray-50">Nominal</th>
+                        <th className="py-4 px-6 bg-gray-50">Status</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                       {riwayatPembayaran.map((item) => (
                         <tr 
                           key={item.id} 
-                          className={`transition-colors ${selectedIds.includes(item.id) ? 'bg-green-50/50' : 'hover:bg-gray-50/50'}`}
+                          className="transition-colors hover:bg-gray-50/50 cursor-pointer"
+                          onClick={() => setSelectedPaymentId(item.id)}
                         >
-                          {/* Kolom Checkbox Row */}
-                          <td className="py-4 px-6">
-                            <input 
-                              type="checkbox" 
-                              className="w-4 h-4 rounded border-gray-300 text-[#015023] focus:ring-[#015023] cursor-pointer"
-                              checked={selectedIds.includes(item.id)}
-                              onChange={() => handleSelectRow(item.id)}
-                            />
-                          </td>
                           <td className="py-4 px-6">
                             <p className="text-sm font-bold text-[#015023]">{item.semester}</p>
                             <p className="text-xs text-gray-400 mt-0.5">{item.tahun}</p>
@@ -310,16 +245,18 @@ return (
                             <p className="text-sm font-bold text-gray-800">{formatRupiah(item.nominal)}</p>
                           </td>
                           <td className="py-4 px-6">
-                            <div className="inline-flex items-center gap-1.5 bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold">
-                              <CheckCircle className="w-3.5 h-3.5" />
+                            <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${
+                              item.status === 'Disetujui' 
+                                ? 'bg-green-100 text-green-700' 
+                                : item.status === 'Ditolak'
+                                  ? 'bg-red-100 text-red-700'
+                                  : 'bg-orange-100 text-orange-700'
+                            }`}>
+                              {item.status === 'Disetujui' && <CheckCircle className="w-3.5 h-3.5" />}
+                              {item.status === 'Ditolak' && <X className="w-3.5 h-3.5" />}
+                              {item.status !== 'Disetujui' && item.status !== 'Ditolak' && <AlertCircle className="w-3.5 h-3.5" />}
                               {item.status}
                             </div>
-                          </td>
-                          <td className="py-4 px-6 text-right">
-                            <button className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 hover:bg-green-50 hover:text-[#015023] hover:border-green-200 rounded-lg text-xs font-bold transition-all shadow-sm">
-                              <Download className="w-3.5 h-3.5" />
-                              Kwitansi
-                            </button>
                           </td>
                         </tr>
                       ))}
@@ -373,6 +310,11 @@ return (
         </div>
 
       </main>
+      
+      <PaymentDetailModal 
+        paymentId={selectedPaymentId} 
+        onClose={() => setSelectedPaymentId(null)} 
+      />
 
       <Footer />
     </div>

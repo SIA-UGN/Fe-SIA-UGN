@@ -80,8 +80,7 @@ export default function MahasiswaThesisTopicsPage() {
         <div className="space-y-6">
           {thesis ? (
             <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
-              Anda sudah memiliki pengajuan TA aktif. Detail topik masih dapat dilihat, tetapi pemilihan topik akan diarahkan
-              ke halaman pengajuan aktif.
+              Anda sudah memiliki pengajuan TA aktif. Detail topik masih dapat dilihat, tetapi Anda tidak dapat melakukan pengajuan baru.
             </div>
           ) : null}
 

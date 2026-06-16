@@ -12,21 +12,23 @@ export default function LibraryBookCard({
   const isAvailable = Boolean(book?.is_available) && Number(book?.available_stock || 0) > 0;
 
   return (
-    <article className="overflow-hidden rounded-[14px] bg-white shadow-md">
-      <div className="relative">
+    <article className="flex h-full flex-col overflow-hidden rounded-[14px] bg-white shadow-md">
+      <div className="relative shrink-0">
         <BookIconTile />
         <LibraryStockBadge isAvailable={isAvailable} className="absolute right-3 top-3" />
       </div>
 
-      <div className="space-y-3 p-4">
-        <span
-          className="inline-flex rounded-md bg-[#e6eee9] px-2 py-1 text-[12px] font-medium text-[#015023]"
-          style={{ fontFamily: 'Urbanist, sans-serif' }}
-        >
-          {book?.category?.name || 'Tanpa Kategori'}
-        </span>
+      <div className="flex flex-1 flex-col p-4">
+        <div className="mb-3">
+          <span
+            className="inline-flex rounded-md bg-[#e6eee9] px-2 py-1 text-[12px] font-medium text-[#015023]"
+            style={{ fontFamily: 'Urbanist, sans-serif' }}
+          >
+            {book?.category?.name || 'Tanpa Kategori'}
+          </span>
+        </div>
 
-        <div>
+        <div className="mb-3">
           {detailHref ? (
             <Link
               href={detailHref}
@@ -46,7 +48,7 @@ export default function LibraryBookCard({
         </div>
 
         <div
-          className="space-y-1 text-[15px] text-[#4b5563]"
+          className="mb-4 space-y-1 text-[15px] text-[#4b5563]"
           style={{ fontFamily: 'Urbanist, sans-serif' }}
         >
           <p>Penulis: {book?.author || '-'}</p>
@@ -55,25 +57,27 @@ export default function LibraryBookCard({
           <p>ISBN: {book?.isbn || '-'}</p>
         </div>
 
-        <p
-          className="text-[16px] font-semibold"
-          style={{ fontFamily: 'Urbanist, sans-serif' }}
-        >
-          Stok:{' '}
-          <span className={isAvailable ? 'text-[#16a34a]' : 'text-[#dc2626]'}>
-            {book?.available_stock || 0}/{book?.total_stock || 0}
-          </span>
-        </p>
+        <div className="mt-auto space-y-3 pt-2">
+          <p
+            className="text-[16px] font-semibold"
+            style={{ fontFamily: 'Urbanist, sans-serif' }}
+          >
+            Stok:{' '}
+            <span className={isAvailable ? 'text-[#16a34a]' : 'text-[#dc2626]'}>
+              {book?.available_stock || 0}/{book?.total_stock || 0}
+            </span>
+          </p>
 
-        <PrimaryButton
-          type="button"
-          className="h-11 w-full text-[20px] font-semibold"
-          disabled={!isAvailable || ordering}
-          onClick={() => onOrder?.(book)}
-          style={!isAvailable ? { backgroundColor: '#c6ccd7', color: '#6b7280' } : undefined}
-        >
-          {ordering ? 'Memesan...' : isAvailable ? 'Pesan Buku' : 'Stok Habis'}
-        </PrimaryButton>
+          <PrimaryButton
+            type="button"
+            className="h-11 w-full text-[20px] font-semibold"
+            disabled={!isAvailable || ordering}
+            onClick={() => onOrder?.(book)}
+            style={!isAvailable ? { backgroundColor: '#c6ccd7', color: '#6b7280' } : undefined}
+          >
+            {ordering ? 'Memesan...' : isAvailable ? 'Pesan Buku' : 'Stok Habis'}
+          </PrimaryButton>
+        </div>
       </div>
     </article>
   );

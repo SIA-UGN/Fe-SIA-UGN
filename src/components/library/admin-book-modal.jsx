@@ -23,6 +23,7 @@ export default function AdminBookModal({
   editingBook = null,
   saving = false,
   onCreateCategory,
+  prefillData = null,
 }) {
   const [form, setForm] = useState(initialForm);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -42,10 +43,16 @@ export default function AdminBookModal({
         total_stock: editingBook.total_stock != null ? String(editingBook.total_stock) : '',
         available_stock: editingBook.available_stock != null ? String(editingBook.available_stock) : '',
       });
+    } else if (prefillData) {
+      setForm({
+        ...initialForm,
+        title: prefillData.title || '',
+        author: prefillData.author || '',
+      });
     } else {
       setForm(initialForm);
     }
-  }, [editingBook, open]);
+  }, [editingBook, open, prefillData]);
 
   useEffect(() => {
     if (!open) {

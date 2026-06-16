@@ -1,4 +1,5 @@
-import { useState } from 'react';
+"use client";
+import { useState, useEffect } from 'react';
 import { Trash2, Edit, Eye, Power } from 'lucide-react';
 import {
   Pagination,
@@ -14,6 +15,7 @@ export default function DataTable({
   data = [],
   actions = [],
   pagination = true,
+  itemsPerPage = 10,
   onEdit,
   onDelete,
   onDetail,
@@ -28,8 +30,11 @@ export default function DataTable({
   noShadow = false,
 }) {
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
-  const totalPages = Math.ceil(data.length / itemsPerPage);
+  const totalPages = Math.max(1, Math.ceil(data.length / itemsPerPage));
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [data.length]);
 
   // Paginated data
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -54,7 +59,12 @@ export default function DataTable({
       <div className="flex items-center justify-center gap-2">
         {actions.includes('detail') && (
           <button
-            onClick={() => onDetail && onDetail(item, index)}
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onDetail && onDetail(item, index);
+            }}
             className="text-white p-2 transition shadow-sm hover:opacity-90"
             style={{
               backgroundColor: '#0066CC',
@@ -69,7 +79,12 @@ export default function DataTable({
         )}
         {actions.includes('edit') && (
           <button
-            onClick={() => onEdit && onEdit(item, index)}
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onEdit && onEdit(item, index);
+            }}
             className="text-white p-2 transition shadow-sm hover:opacity-90"
             style={{
               backgroundColor: '#16874B',
@@ -84,7 +99,12 @@ export default function DataTable({
         )}
         {actions.includes('delete') && (
           <button
-            onClick={() => onDelete && onDelete(item, index)}
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onDelete && onDelete(item, index);
+            }}
             className="text-white p-2 transition shadow-sm hover:opacity-90"
             style={{
               backgroundColor: '#BE0414',
@@ -99,7 +119,12 @@ export default function DataTable({
         )}
         {actions.includes('activate') && (
           <button
-            onClick={() => onActivate && onActivate(item, index)}
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onActivate && onActivate(item, index);
+            }}
             className="text-white p-2 transition shadow-sm hover:opacity-90"
             style={{
               backgroundColor: item.is_active ? '#BE0414' : '#16874B',

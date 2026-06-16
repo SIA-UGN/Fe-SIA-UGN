@@ -36,7 +36,7 @@ export default function UktPaymentPage() {
   const [isCopied, setIsCopied] = useState(false);
   const [openAccordion, setOpenAccordion] = useState('atm');
   const [isSyncing, setIsSyncing] = useState(false);
-  const [isLoadingTransaction, setIsLoadingTransaction] = useState(!!transactionId);
+  const [isLoadingTransaction, setIsLoadingTransaction] = useState(true);
   const [error, setError] = useState(null);
   const [transactionData, setTransactionData] = useState(null);
   const [paymentStatusData, setPaymentStatusData] = useState(null);
@@ -163,14 +163,16 @@ export default function UktPaymentPage() {
   };
 
   const handleSubmitPaymentProof = async () => {
-    if (!paymentProofFile || !transactionId) {
-      toast.error('Pilih file bukti pembayaran');
+    // API expects tuition_fee ID, not tuition_payment ID
+    const tuitionFeeId = transactionData?.tuition_fee?.id_tuition_fee;
+    if (!paymentProofFile || !tuitionFeeId) {
+      toast.error(tuitionFeeId ? 'Pilih file bukti pembayaran' : 'Data tagihan tidak ditemukan. Coba muat ulang halaman.');
       return;
     }
 
     setIsUploading(true);
     try {
-      const response = await submitStudentPayment(transactionId, {
+      const response = await submitStudentPayment(tuitionFeeId, {
         payment_proof: paymentProofFile,
         payment_method: 'bank_transfer',
       });

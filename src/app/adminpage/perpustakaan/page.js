@@ -73,6 +73,7 @@ export default function AdminLibraryPage() {
   const [error, setError] = useState('');
   const [bookModalOpen, setBookModalOpen] = useState(false);
   const [editingBook, setEditingBook] = useState(null);
+  const [prefillData, setPrefillData] = useState(null);
   const [saving, setSaving] = useState(false);
   const [togglingId, setTogglingId] = useState(null);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -105,11 +106,7 @@ export default function AdminLibraryPage() {
     setError('');
 
     try {
-      const response = await getAdminLibraryBooks({
-        search: appliedSearch || undefined,
-        page,
-        per_page: PER_PAGE,
-      });
+      const response = await getAdminLibraryBooks({});
       const parsed = parsePaginatedData(response);
       setBooks(parsed.data);
       setMeta(parsed.meta);
@@ -119,10 +116,36 @@ export default function AdminLibraryPage() {
     } finally {
       setLoading(false);
     }
-  }, [appliedSearch, page]);
+  }, []);
 
   useEffect(() => { fetchDashboard(); fetchCategories(); }, [fetchDashboard, fetchCategories]);
   useEffect(() => { fetchBooks(); }, [fetchBooks]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const searchParams = new URLSearchParams(window.location.search);
+      
+      const filterParam = searchParams.get('filter');
+      if (filterParam && ['all', 'critical', 'popular'].includes(filterParam)) {
+        setActiveFilter(filterParam);
+      }
+
+      if (searchParams.get('addBook') === 'true') {
+        const title = searchParams.get('title') || '';
+        const author = searchParams.get('author') || '';
+        
+        setPrefillData({ title, author });
+        setEditingBook(null);
+        setBookModalOpen(true);
+
+        const newUrl = new URL(window.location);
+        newUrl.searchParams.delete('addBook');
+        newUrl.searchParams.delete('title');
+        newUrl.searchParams.delete('author');
+        window.history.replaceState({}, '', newUrl);
+      }
+    }
+  }, []);
 
   /* ── computed stats ── */
   const statCards = useMemo(() => [
@@ -311,6 +334,38 @@ export default function AdminLibraryPage() {
     return pages.slice(Math.max(0, page - 3), Math.min(meta.last_page, page + 2));
   }, [meta.last_page, page]);
 
+  const filteredBooks = useMemo(() => {
+    let result = [...books];
+
+    if (appliedSearch) {
+      const query = appliedSearch.toLowerCase();
+      result = result.filter(book => {
+        const titleMatch = book.title?.toLowerCase().includes(query);
+        const authorMatch = book.author?.toLowerCase().includes(query);
+        const categoryMatch = (book.category?.name || book.category)?.toString().toLowerCase().includes(query);
+        const isbnMatch = book.isbn?.toLowerCase().includes(query);
+        const publisherMatch = book.publisher?.toLowerCase().includes(query);
+        const yearMatch = book.year?.toString().toLowerCase().includes(query);
+
+        return titleMatch || authorMatch || categoryMatch || isbnMatch || publisherMatch || yearMatch;
+      });
+    }
+
+    if (activeFilter === 'critical') {
+      result = result.filter(book => (book.available_stock ?? 0) <= 1 || (book.total_stock ?? 0) === 0);
+    } else if (activeFilter === 'popular') {
+      result = result.filter(book => {
+         const borrowed = (book.total_stock ?? 0) - (book.available_stock ?? 0);
+         return borrowed > 0;
+      }).sort((a, b) => {
+         const borrowedA = (a.total_stock ?? 0) - (a.available_stock ?? 0);
+         const borrowedB = (b.total_stock ?? 0) - (b.available_stock ?? 0);
+         return borrowedB - borrowedA;
+      });
+    }
+    return result;
+  }, [books, activeFilter, appliedSearch]);
+
   return (
     <div className="min-h-screen flex flex-col">
       <AdminNavbar title="Manajemen Perpustakaan" />
@@ -401,9 +456,15 @@ export default function AdminLibraryPage() {
               
               <input
                   type="text"
-                  placeholder="Cari subjek, dosen, atau mahasiswa..."
+                  placeholder="Cari Judul, Penulis, atau ISBN..."
                   value={searchInput}
                   onChange={(e) => setSearchInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      setAppliedSearch(searchInput.trim());
+                      setPage(1);
+                    }
+                  }}
                   className="bg-transparent flex-1 outline-none text-sm text-gray-700 placeholder-gray-600"
                   style={{ color: '#015023' }}
               />
@@ -431,6 +492,12 @@ export default function AdminLibraryPage() {
                   setActiveFilter(btn.key);
                   setPage(1);
                   setAppliedSearch(searchInput.trim());
+                  
+                  if (typeof window !== 'undefined') {
+                    const newUrl = new URL(window.location);
+                    newUrl.searchParams.set('filter', btn.key);
+                    window.history.replaceState({}, '', newUrl);
+                  }
                 }}
                 className={`inline-flex h-[40px] items-center gap-1.5 rounded-[10px] px-4 text-[14px] font-semibold transition-colors ${
                   isActive
@@ -459,21 +526,23 @@ export default function AdminLibraryPage() {
       <div className='w-full mt-4'>        
         <DataTable
           columns={bookscolumn}
-          data={books}
+          data={filteredBooks}
           customRender={customRenderBooks}
           pagination={true}
+          itemsPerPage={PER_PAGE}
         />
       </div>
 
       {/* ── Book Modal ── */}
       <AdminBookModal
         open={bookModalOpen}
-        onClose={() => { setBookModalOpen(false); setEditingBook(null); }}
+        onClose={() => { setBookModalOpen(false); setEditingBook(null); setPrefillData(null); }}
         onSubmit={handleBookSubmit}
         categories={categories}
         editingBook={editingBook}
         saving={saving}
         onCreateCategory={handleCreateCategory}
+        prefillData={prefillData}
       />
 
       {/* ── Delete Confirmation Modal ── */}

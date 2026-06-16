@@ -43,13 +43,14 @@ export default function MahasiswaTopicDetailPage() {
     fetchData();
   }, [fetchData]);
 
-  useEffect(() => {
-    if (!thesis) return;
-    const timer = setTimeout(() => {
-      router.replace('/bimbingan-ta/mahasiswa/pengajuan');
-    }, 1500);
-    return () => clearTimeout(timer);
-  }, [router, thesis]);
+  // Mencegah auto-redirect agar mahasiswa tetap bisa melihat detail topik
+  // useEffect(() => {
+  //   if (!thesis) return;
+  //   const timer = setTimeout(() => {
+  //     router.replace('/bimbingan-ta/mahasiswa/pengajuan');
+  //   }, 1500);
+  //   return () => clearTimeout(timer);
+  // }, [router, thesis]);
 
   const handleSelectTopic = async (payload: { student_note?: string; attachment_proposal?: File | null }) => {
     setIsSubmitting(true);
@@ -78,7 +79,7 @@ export default function MahasiswaTopicDetailPage() {
         <div className="space-y-6">
           {thesis ? (
             <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
-              Anda sudah memiliki pengajuan TA aktif. Anda akan diarahkan ke halaman pengajuan aktif.
+              Anda sudah memiliki pengajuan TA aktif. Anda tidak dapat melakukan pengajuan untuk topik ini.
             </div>
           ) : null}
 

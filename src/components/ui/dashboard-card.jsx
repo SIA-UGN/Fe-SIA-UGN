@@ -15,14 +15,14 @@ onClick,
 <div
 ref={ref}
 className={cn(
-    "bg-white border border-gray-200 shadow-lg hover:shadow-xl transition-shadow duration-300 p-4 sm:p-6 flex flex-col items-center text-center",
+    "bg-white border border-gray-200 shadow-lg hover:shadow-xl transition-shadow duration-300 p-4 sm:p-6 flex flex-col items-center text-center h-full",
     className
 )}
 style={{ borderRadius: '12px', cursor: 'default' }}
 {...props}
 >
 {icon && (
-    <div className="mb-3 sm:mb-4 p-2 sm:p-3 rounded-full flex items-center justify-center" style={{ backgroundColor: '#015023' }}>
+    <div className="mb-3 sm:mb-4 p-2 sm:p-3 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: '#015023' }}>
     <div className="w-6 h-6 sm:w-8 sm:h-8 text-white flex items-center justify-center" style={{ color: '#FFFFFF' }}>
         {icon}
     </div>
@@ -37,13 +37,15 @@ style={{ borderRadius: '12px', cursor: 'default' }}
     </h3>
 )}
 {description && (
-    <p className="text-xs sm:text-sm text-gray-600 mb-3 sm:mb-4" style={{
+    <p className="text-xs sm:text-sm text-gray-600 mb-3 sm:mb-4 flex-1" style={{
     fontFamily: 'Urbanist, sans-serif'
     }}>
     {description}  
     </p>
 )}
-{children}
+<div className="w-full mt-auto">
+  {children}
+</div>
 </div>
 ))
 

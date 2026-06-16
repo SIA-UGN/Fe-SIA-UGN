@@ -10,6 +10,7 @@ import { BookOpen, Users, Search} from 'lucide-react';
 import DataTable from '@/components/ui/table';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
+import { toast } from 'sonner';
 
 const font = { fontFamily: 'Urbanist, sans-serif' };
 
@@ -51,54 +52,29 @@ export default function ThesisUsersPage() {
   ];
   
   // Dummy data Mahasiswa
-  const dummyStudents = [
-    {
-      id: 1,
-      no: 1,
-      nim: '20220100001',
-      nama: 'Hasan Fahrezi',
-      program_studi: 'Teknik Informatika',
-      semester: 8,
-      ipk: 3.72,
-      status: 'Aktif',
-      dosen_pembimbing: 'Belum ditentukan',
-    },
-    {
-      id: 2,
-      no: 2,
-      nim: '20220100002',
-      nama: 'Siti Aminah',
-      program_studi: 'Teknik Informatika',
-      semester: 8,
-      ipk: 3.85,
-      status: 'Lulus',
-      dosen_pembimbing: 'Dr. Ahmad Santoso',
-    },
-  ];
+  const dummyStudents = Array.from({ length: 25 }).map((_, i) => ({
+    id: i + 1,
+    no: i + 1,
+    nim: `2022010${(i + 1).toString().padStart(3, '0')}`,
+    nama: i % 2 === 0 ? `Hasan Fahrezi ${i + 1}` : `Siti Aminah ${i + 1}`,
+    program_studi: i % 3 === 0 ? 'Sistem Informasi' : 'Teknik Informatika',
+    semester: 8,
+    ipk: (3.5 + (i % 5) * 0.1).toFixed(2),
+    status: i % 4 === 0 ? 'Lulus' : i % 5 === 0 ? 'Cuti' : 'Aktif',
+    dosen_pembimbing: i % 2 === 0 ? 'Dr. Ahmad Santoso' : 'Belum ditentukan',
+  }));
 
   // Dummy data Dosen
-  const dummySupervisors = [
-    {
-      id: 1,
-      no: 1,
-      nip: '19801015200812001',
-      nama: 'Dr. Ahmad Santoso',
-      bidang_keahlian: 'Kecerdasan Buatan',
-      jabatan: 'Lektor Kepala',
-      status: 'Aktif',
-      kuota_bimbingan: '3/5',
-    },
-    {
-      id: 2,
-      no: 2,
-      nip: '197508212005012001',
-      nama: 'Prof. Budi Raharjo',
-      bidang_keahlian: 'Keamanan Siber',
-      jabatan: 'Guru Besar',
-      status: 'Cuti',
-      kuota_bimbingan: '5/5',
-    },
-  ];
+  const dummySupervisors = Array.from({ length: 18 }).map((_, i) => ({
+    id: i + 1,
+    no: i + 1,
+    nip: `19801015200812${(i + 1).toString().padStart(3, '0')}`,
+    nama: i % 2 === 0 ? `Dr. Ahmad Santoso ${i + 1}` : `Prof. Budi Raharjo ${i + 1}`,
+    bidang_keahlian: i % 3 === 0 ? 'Keamanan Siber' : 'Kecerdasan Buatan',
+    jabatan: i % 2 === 0 ? 'Lektor Kepala' : 'Guru Besar',
+    status: i % 4 === 0 ? 'Cuti' : 'Aktif',
+    kuota_bimbingan: `${(i % 5) + 1}/5`,
+  }));
 
   // --- 2. FUNGSI UNTUK RESET FILTER ---
   const clearFilters = useCallback(() => {
@@ -157,6 +133,23 @@ export default function ThesisUsersPage() {
 
     return () => clearTimeout(timer);
   }, [activeTab]);
+
+  // --- 5. EVENT HANDLERS UNTUK AKSI ---
+  const handleEdit = useCallback((item) => {
+    console.log('Edit clicked', item);
+    toast.info(`Edit data: ${item.nama || item.nim_nama || item.nip_nama}`);
+  }, []);
+
+  const handleActivate = useCallback((item) => {
+    console.log('Activate clicked', item);
+    // Karena ini masih menggunakan dummy data, kita buat simulasi perubahannya
+    // Di aplikasi nyata, ini akan memanggil API backend
+    const newStatus = item.status === 'Aktif' ? 'Non-Aktif' : 'Aktif';
+    toast.success(`Status ${item.nama} berhasil diubah menjadi ${newStatus}`);
+    
+    // Update local state (optional simulation)
+    setData(prev => prev.map(d => d.id === item.id ? { ...d, status: newStatus } : d));
+  }, []);
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -267,6 +260,12 @@ export default function ThesisUsersPage() {
                 filterDateTo={filterDateTo}
                 setFilterDateTo={setFilterDateTo}
                 clearFilters={clearFilters}
+                statuses={[
+                  { value: 'aktif', label: 'Aktif' },
+                  { value: 'cuti', label: 'Cuti' },
+                  { value: 'lulus', label: 'Lulus' },
+                  { value: 'non-aktif', label: 'Non-Aktif' }
+                ]}
               />
             </div>
 
@@ -299,6 +298,8 @@ export default function ThesisUsersPage() {
                   columns={activeTab === 'students' ? studentColumns : supervisorColumns}
                   data={filteredUsers}
                   actions={['edit', 'activate']}
+                  onEdit={handleEdit}
+                  onActivate={handleActivate}
                   pagination
                 />
               )}
