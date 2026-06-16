@@ -9,14 +9,9 @@ import Navbar from '@/components/ui/navigation-menu';
 import Footer from '@/components/ui/footer';
 import { Button } from '@/components/ui/button';
 import DataTable from '@/components/ui/table';
-import {
-  MOCK_AVAILABLE_SUBJECTS,
-  MOCK_DEFAULT_DRAFT_CLASS_IDS,
-  MOCK_KRS_QUOTA,
-} from '../mockData';
+import { getKrsQuota, submitKrs } from '@/lib/krs';
 
 const KRS_DRAFT_STORAGE_KEY = 'krs-mahasiswa-draft-selection';
-const KRS_SUBMISSION_STORAGE_KEY = 'krs-mahasiswa-last-submission';
 
 function formatTime(value) {
   if (!value) {
@@ -79,81 +74,35 @@ function clearDraftStorage() {
   sessionStorage.removeItem(KRS_DRAFT_STORAGE_KEY);
 }
 
-function saveSubmissionToStorage(payload) {
-  if (typeof window === 'undefined') {
-    return;
-  }
-
-  sessionStorage.setItem(KRS_SUBMISSION_STORAGE_KEY, JSON.stringify(payload));
-}
-
-function readSubmissionFromStorage() {
-  if (typeof window === 'undefined') {
-    return null;
-  }
-
-  try {
-    const raw = sessionStorage.getItem(KRS_SUBMISSION_STORAGE_KEY);
-    if (!raw) {
-      return null;
-    }
-
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === 'object' && parsed.is_submitted === true ? parsed : null;
-  } catch (_error) {
-    return null;
-  }
-}
-
 function calculateTotalSks(items = []) {
   return items.reduce((acc, item) => acc + Number(item?.sks || 0), 0);
 }
 
-function buildMockDraftSelection() {
-  const flatRows = MOCK_AVAILABLE_SUBJECTS.flatMap((subject) => {
-    const classes = Array.isArray(subject?.classes) ? subject.classes : [];
-
-    return classes.map((classItem) => ({
-      id: classItem.id_class,
-      id_class: classItem.id_class,
-      id_subject: subject.id_subject,
-      kode_mk: subject.code_subject,
-      nama_mk: subject.name_subject,
-      sks: Number(subject.sks || 0),
-      kode_kelas: classItem.code_class,
-      day_of_week: classItem.day_of_week,
-      start_time: classItem.start_time,
-      end_time: classItem.end_time,
-      dosen: Array.isArray(classItem.lecturers)
-        ? classItem.lecturers.map((lecturer) => lecturer?.name).filter(Boolean).join(', ')
-        : '-',
-      jenis: 'Wajib',
-    }));
-  });
-
-  return flatRows.filter((row) => MOCK_DEFAULT_DRAFT_CLASS_IDS.includes(row.id_class));
-}
-
 export default function ReviewKrsPage() {
   const router = useRouter();
-  const [quota] = useState(MOCK_KRS_QUOTA);
+  const [quota, setQuota] = useState(null);
   const [draftSelection, setDraftSelection] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isAlreadySubmitted, setIsAlreadySubmitted] = useState(false);
 
   useEffect(() => {
-    const existingSubmission = readSubmissionFromStorage();
-    if (existingSubmission) {
-      setIsAlreadySubmitted(true);
-      router.replace('/krsmahasiswa/status');
-      return;
-    }
+    let active = true;
 
+    // Draft adalah keranjang sementara dari halaman "pilih" (sessionStorage).
     const draftItems = readDraftFromStorage();
-    const seededDraft = draftItems.length > 0 ? draftItems : buildMockDraftSelection();
+    setDraftSelection(draftItems);
+    saveDraftToStorage(draftItems);
 
-    setDraftSelection(seededDraft);
-    saveDraftToStorage(seededDraft);
+    // A6 — ambil kuota untuk header progres SKS.
+    (async () => {
+      const { data } = await getKrsQuota();
+      if (active && data?.data) {
+        setQuota(data.data);
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
   }, [router]);
 
   const draftTotalSks = useMemo(() => calculateTotalSks(draftSelection), [draftSelection]);
@@ -179,12 +128,6 @@ export default function ReviewKrsPage() {
   };
 
   const handleSubmitKrs = async () => {
-    if (isAlreadySubmitted || readSubmissionFromStorage()) {
-      toast.info('KRS sudah diajukan. Lihat Status KRS untuk detailnya.');
-      router.push('/krsmahasiswa/status');
-      return;
-    }
-
     if (draftSelection.length === 0) {
       toast.error('Belum ada mata kuliah untuk diajukan.');
       return;
@@ -192,31 +135,42 @@ export default function ReviewKrsPage() {
 
     setIsSubmitting(true);
 
-    await new Promise((resolve) => {
-      setTimeout(resolve, 500);
-    });
+    // A9 — POST /student/krs hanya menerima 1 kelas per request, jadi seluruh
+    // pilihan diajukan satu per satu. Sesi aktif diisi otomatis oleh backend.
+    const failed = [];
+    let successCount = 0;
 
-    const submittedAt = new Date().toISOString();
-    const submissionPayload = {
-      id_submission: `MOCK-KRS-${Date.now()}`,
-      is_submitted: true,
-      academic_period: quota?.academic_period?.name || '-',
-      advisor_name: 'Dr. Ahmad Fauzi, M.Kom',
-      status: 'pending',
-      submitted_at: submittedAt,
-      courses: draftSelection.map((item, index) => ({
-        ...item,
-        jenis: item?.jenis || (index === 0 ? 'Wajib' : 'Pilihan'),
-        status: 'pending',
-      })),
-    };
+    for (const item of draftSelection) {
+      const { error } = await submitKrs({ id_class: item.id_class });
+      if (error) {
+        failed.push({ item, message: error.message });
+      } else {
+        successCount += 1;
+      }
+    }
 
-    saveSubmissionToStorage(submissionPayload);
-    clearDraftStorage();
-    setDraftSelection([]);
-    toast.success('Pengajuan KRS berhasil dikirim.');
+    if (failed.length === 0) {
+      clearDraftStorage();
+      setDraftSelection([]);
+      toast.success('Pengajuan KRS berhasil dikirim.');
+      setIsSubmitting(false);
+      router.push('/krsmahasiswa/status');
+      return;
+    }
+
+    // Sebagian/seluruhnya gagal: sisakan hanya item yang gagal di keranjang
+    // agar mahasiswa bisa memperbaiki & mengajukan ulang.
+    const failedItems = failed.map((entry) => entry.item);
+    setDraftSelection(failedItems);
+    saveDraftToStorage(failedItems);
+
+    const firstMessage = failed[0]?.message || 'Sebagian pengajuan KRS gagal.';
+    if (successCount > 0) {
+      toast.error(`${successCount} mata kuliah berhasil diajukan, ${failed.length} gagal. ${firstMessage}`);
+    } else {
+      toast.error(firstMessage);
+    }
     setIsSubmitting(false);
-    router.push('/krsmahasiswa/status');
   };
 
   const tableColumns = [
@@ -372,9 +326,9 @@ export default function ReviewKrsPage() {
                   onClick={handleSubmitKrs}
                   className="h-11 px-6 text-sm font-semibold"
                   style={{ backgroundColor: '#015023' }}
-                  disabled={isSubmitting || draftSelection.length === 0 || isAlreadySubmitted}
+                  disabled={isSubmitting || draftSelection.length === 0}
                 >
-                  {isSubmitting ? 'Memproses...' : isAlreadySubmitted ? 'Sudah Diajukan' : 'Ajukan KRS'}
+                  {isSubmitting ? 'Memproses...' : 'Ajukan KRS'}
                 </Button>
               </div>
             </div>

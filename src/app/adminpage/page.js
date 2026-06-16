@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { DashboardCard, StatCard } from '@/components/ui/dashboard-card'
@@ -9,7 +10,7 @@ import Footer from '@/components/ui/footer'
 import { useDashboardStats } from '@/features/admin-dashboard/hooks/useDashboardStats'
 import Cookies from 'js-cookie'
 import { ErrorMessageBoxWithButton } from '@/components/ui/message-box'
-import { GraduationCap, Megaphone, Mail, SquareLibrary, Clock, ClipboardCheck, CreditCard } from 'lucide-react'
+import { GraduationCap, Megaphone, Mail, SquareLibrary, Clock, ClipboardCheck, CreditCard, Gauge } from 'lucide-react'
 
 // Icons - using icons from /public/icon folder
 const PlusIcon = () => (
@@ -103,6 +104,17 @@ const GradeIcon = () => (
 export default function AdminDashboard() {
   const router = useRouter();
 
+  // Role berasal dari cookie yang hanya ada di client. Saat SSR Cookies.get()
+  // mengembalikan undefined sehingga kartu khusus admin tidak dirender, tetapi
+  // di client kartu itu muncul → daftar kartu bergeser → hydration mismatch.
+  // Gate role di belakang flag `mounted`: render pertama (server & client) sama,
+  // kartu khusus admin baru muncul setelah komponen ter-mount.
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    setIsAdmin(Cookies.get('roles') === 'admin');
+  }, []);
+
   // Use the extracted hook for statistics
   const { statistics, isLoading: loading, error, refetch: fetchStatistics } = useDashboardStats();
 
@@ -149,6 +161,9 @@ export default function AdminDashboard() {
       case 'manage-krs-time':
         router.push('/adminpage/kelolawaktukrs');
         break;
+      case 'manage-krs-quota':
+        router.push('/adminpage/kelolakuotakrs');
+        break;
       case 'approval-krs':
         router.push('/adminpage/approvalKRS');
         break;
@@ -180,7 +195,7 @@ export default function AdminDashboard() {
       action: () => handleCardClick('manage-student')
     },
     // Card Tambah Akun Manajer hanya untuk admin
-    ...(Cookies.get('roles') === 'admin' ? [{
+    ...(isAdmin ? [{
       id: 'manage-manager',
       title: 'Manajemen Akun Manajer',
       description: 'Buat akun manajer untuk administrasi',
@@ -249,6 +264,13 @@ export default function AdminDashboard() {
       description: 'Atur jadwal pembukaan dan penutupan pengisian KRS untuk setiap semester',
       icon: <Clock className="w-8 h-8" />,
       action: () => handleCardClick('manage-krs-time')
+    },
+    {
+      id: 'manage-krs-quota',
+      title: 'Kelola Kuota KRS',
+      description: 'Tetapkan batas maksimal SKS yang dapat diambil setiap mahasiswa per periode',
+      icon: <Gauge className="w-8 h-8" />,
+      action: () => handleCardClick('manage-krs-quota')
     },
     {
       id: 'approval-krs',
@@ -370,15 +392,15 @@ export default function AdminDashboard() {
                     icon={card.icon}
                   >
                     <PrimaryButton className="w-full mt-4" onClick={card.action}>
-                      {card.id.startsWith('manage-') ? (
-                        <>
-                          <SettingsIcon />
-                          Kelola
-                        </>
-                      ) : (
+                      {card.id === 'create-broadcast' ? (
                         <>
                           <PlusIcon />
                           Buat Pengumuman
+                        </>
+                      ) : (
+                        <>
+                          <SettingsIcon />
+                          Kelola
                         </>
                       )}
                     </PrimaryButton>

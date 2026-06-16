@@ -15,10 +15,18 @@ import {
 import { Button } from '@/components/ui/button';
 import { ErrorMessageBox, SuccessMessageBoxWithButton } from '@/components/ui/message-box';
 import { AlertConfirmationRedDialog } from '@/components/ui/alert-dialog';
+import { createKrsSession } from '@/services/adminKrsSessionService';
+import { getAcademicPeriods } from '@/services/academicPeriodService';
 
-// TODO: replace with real API
-async function storeKrsSession(data) {
-  return { status: 'success' };
+function resolveErrorMessage(err) {
+  if (!err) return 'Terjadi kesalahan, coba beberapa saat lagi';
+  if (err.status === 403) return 'Anda tidak memiliki akses ke fitur ini';
+  if (err.status >= 500)  return 'Terjadi kesalahan, coba beberapa saat lagi';
+  if (err.errors && typeof err.errors === 'object') {
+    const msgs = Object.values(err.errors).flat().filter(Boolean);
+    if (msgs.length) return msgs.join(' ');
+  }
+  return err.message || 'Terjadi kesalahan, coba beberapa saat lagi';
 }
 
 const STATUS_OPTIONS = [
@@ -69,19 +77,42 @@ export default function TambahSesiKRS() {
     e.preventDefault();
     if (!validate()) return;
     setIsLoading(true);
-    try {
-      const res = await storeKrsSession(formData);
-      if (res.status === 'success') {
-        setSuccess('Sesi KRS berhasil ditambahkan.');
-        setFormData({ name: '', start_date: '', end_date: '', status: '' });
-      } else {
-        setErrors(prev => ({ ...prev, form: res.message || 'Gagal menyimpan data.' }));
-      }
-    } catch (err) {
-      setErrors(prev => ({ ...prev, form: err.message }));
-    } finally {
+
+    // B2 (createKrsSession) wajib id_academic_period. Form tidak punya selector
+    // periode → cocokkan nama sesi dengan periode akademik, fallback periode aktif.
+    const { data: periodsRes, error: pErr } = await getAcademicPeriods();
+    if (pErr) {
+      setErrors(prev => ({ ...prev, form: resolveErrorMessage(pErr) }));
       setIsLoading(false);
+      return;
     }
+    const periods = periodsRes?.data ?? [];
+    const match = periods.find(
+      (p) => p.name?.trim().toLowerCase() === formData.name.trim().toLowerCase()
+    );
+    const period = match ?? periods.find((p) => p.is_active);
+    if (!period) {
+      setErrors(prev => ({
+        ...prev,
+        form: 'Periode akademik tidak ditemukan. Buat/aktifkan periode akademik terlebih dahulu.',
+      }));
+      setIsLoading(false);
+      return;
+    }
+
+    // BE sesi tidak menyimpan nama/tanggal/status manual → nama disimpan sebagai notes.
+    const { error: err } = await createKrsSession({
+      id_academic_period: period.id_academic_period,
+      notes: formData.name,
+    });
+    if (err) {
+      setErrors(prev => ({ ...prev, form: resolveErrorMessage(err) }));
+      setIsLoading(false);
+      return;
+    }
+    setSuccess('Sesi KRS berhasil ditambahkan.');
+    setFormData({ name: '', start_date: '', end_date: '', status: '' });
+    setIsLoading(false);
   };
 
   return (
