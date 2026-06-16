@@ -83,6 +83,8 @@ export const AuthProvider = ({ children }) => {
             name: profileData.name,
             id_program: idProgram,
             program,
+            id_user_si: profileData.id_user_si, // [KELOMPOK 1] dipakai form BKD/Penelitian/Pengabdian
+            email: profileData.email,           // [KELOMPOK 1]
         });
         if (response.data.username) {
             Cookies.set('name', response.data.username);

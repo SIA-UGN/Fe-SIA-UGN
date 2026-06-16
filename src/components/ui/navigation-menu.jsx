@@ -22,6 +22,7 @@ import PersuratanDropdown from '@/features/persuratan/components/PersuratanDropd
 import BimbinganDropdownDosen from '@/features/bimbingan/components/BimbinganDropdownDosen'
 import BimbinganDropdownMahasiswa from '@/features/bimbingan/components/BimbinganDropdownMahasiswa'
 import LibraryDropdown from '@/features/library/components/LibraryDropdown'
+import TridharmaDropdown from '@/features/kelompok1/components/TridharmaDropdown' // [KELOMPOK 1]
 import { useAuth } from '@/lib/auth-context'
 import { logout } from '@/lib/sessionApi'
 import { getCurrentRole, getThesisHomePath } from '@/features/bimbingan-ta/utils'
@@ -62,6 +63,7 @@ const NavbarMenu = forwardRef(({ className, isMobileMenuOpen, setIsMobileMenuOpe
       <NavbarMenuItem href="/akademik">Akademik</NavbarMenuItem>
       <NavbarMenuItem href="/kehadiran">Kehadiran</NavbarMenuItem>
       <NavbarMenuItem href="/hasil-studi">Hasil Studi</NavbarMenuItem>
+      {role === 'dosen' && <TridharmaDropdown /> /* [KELOMPOK 1] */}
       {role === 'mahasiswa' && (
         <NavbarMenuItem href="/krsmahasiswa">Pengisian KRS</NavbarMenuItem>
       )}
@@ -124,6 +126,22 @@ const NavbarMenu = forwardRef(({ className, isMobileMenuOpen, setIsMobileMenuOpe
         >
           Hasil Studi
         </MobileNavMenuItem>
+        {/* [KELOMPOK 1] Modul dosen: Tridharma, Angka Kredit, Gaji */}
+        {role === 'dosen' && (
+          <>
+            <div className="my-2 px-4 py-2" style={{ backgroundColor: '#015023', borderRadius: '10px' }}>
+              <span className="text-xs font-bold uppercase tracking-wider" style={{ color: '#dabc4e' }}>
+                Tridharma
+              </span>
+            </div>
+            <MobileNavMenuItem href="/dosen/kegiatan-mengajar" onClick={() => setIsMobileMenuOpen(false)}>Kegiatan Mengajar</MobileNavMenuItem>
+            <MobileNavMenuItem href="/dosen/penelitian" onClick={() => setIsMobileMenuOpen(false)}>Penelitian</MobileNavMenuItem>
+            <MobileNavMenuItem href="/dosen/publikasi" onClick={() => setIsMobileMenuOpen(false)}>Publikasi Ilmiah</MobileNavMenuItem>
+            <MobileNavMenuItem href="/dosen/pengabdian" onClick={() => setIsMobileMenuOpen(false)}>Pengabdian Masyarakat</MobileNavMenuItem>
+            <MobileNavMenuItem href="/dosen/angka-kredit" onClick={() => setIsMobileMenuOpen(false)}>Angka Kredit</MobileNavMenuItem>
+            <MobileNavMenuItem href="/administrasi/payroll" onClick={() => setIsMobileMenuOpen(false)}>Gaji</MobileNavMenuItem>
+          </>
+        )}
         {role === 'mahasiswa' && (
           <MobileNavMenuItem
             href="/krsmahasiswa"
