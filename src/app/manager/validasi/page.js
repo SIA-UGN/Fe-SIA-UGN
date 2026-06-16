@@ -11,7 +11,6 @@ import Footer from '@/components/ui/footer';
 import {
     getKegiatanManager, validasiKegiatan,
     getPenelitianManager, validasiPenelitian,
-    getPengabdianManager, validasiPengabdian,
     getManagerPengajuanBkd, validasiPengajuanBkd,
     getBkdSubmissions,
     getProposalManager,
@@ -62,17 +61,6 @@ const TABS = [
         dosen: i => i.authors?.[0]?.name,
         status: i => i.status_validasi,
         pending: i => i.status_validasi === 'Diajukan',
-    },
-    {
-        key: 'pengabdian', label: 'Pengabdian', icon: Heart,
-        fetch: getPengabdianManager,
-        validate: (id, approve) => validasiPengabdian(id, approve ? 'Disetujui' : 'Ditolak'),
-        title: i => i.judul_kegiatan,
-        sub:   i => [i.skema, i.lokasi].filter(Boolean).join(' · '),
-        meta:  i => [i.tahun_pelaksanaan, i.sumber_dana].filter(Boolean),
-        dosen: i => i.authors?.[0]?.name,
-        status: i => i.status_validasi,
-        pending: i => ['Draft', 'Diajukan'].includes(i.status_validasi),
     },
     {
         key: 'bkd', label: 'Angka Kredit', icon: Award,

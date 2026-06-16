@@ -81,8 +81,8 @@ export default function AktivitasDosenPage() {
     const noAktivitasMsg = !loadingA && !aktivitas;
 
     // Approve via Aktivitas Dosen (sesuai Figma): item PENDING → halaman Review
-    const PENDING = { kegiatan: 'Diajukan', publikasi: 'Diajukan', pengabdian: 'Diajukan', penelitian: 'Pengajuan' };
-    const ROUTE   = { kegiatan: 'kegiatan', publikasi: 'penelitian', pengabdian: 'pengabdian', penelitian: 'penelitian-proposal' };
+    const PENDING = { kegiatan: 'Diajukan', publikasi: 'Diajukan', penelitian: 'Pengajuan' };
+    const ROUTE   = { kegiatan: 'kegiatan', publikasi: 'penelitian', penelitian: 'penelitian-proposal' };
     const reviewHref = (type, item) => (item?.id && item.status === PENDING[type]) ? `/manager/validasi/${ROUTE[type]}/${item.id}?dosen=${id}` : null;
     const openReview = (type, item) => { const h = reviewHref(type, item); if (h) router.push(h); };
     const ReviewTag = ({ show }) => show ? <span style={{ fontSize: 11, fontWeight: 700, color: '#1a4731', whiteSpace: 'nowrap' }}>Review →</span> : null;
@@ -235,37 +235,6 @@ export default function AktivitasDosenPage() {
                             <div>
                                 <div style={{ fontSize: 13, fontWeight: 600 }}>{p.judul}</div>
                                 <div style={{ fontSize: 11, color: '#9ca3af' }}>{p.jurnal} · {p.tahun}</div>
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>{statusBadge(p.status)}<ReviewTag show={!!href} /></div>
-                        </div>
-                        );
-                    })}
-                </div>
-
-                {/* ── Pengabdian (pending BE) ── */}
-                <div style={S.card}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                        <div style={S.hdr}>
-                            <div style={S.ico}><Heart size={20} color="#c9a800" /></div>
-                            <div style={S.title}>Pengabdian Masyarakat</div>
-                        </div>
-                        {aktivitas?.pengabdian?.length > 0 && (
-                            <span style={{ ...S.badge, background: '#f0f4f0', color: '#1a4731' }}>
-                                {aktivitas.pengabdian.length} kegiatan
-                            </span>
-                        )}
-                    </div>
-                    {noAktivitasMsg ? (
-                        <div style={S.empty}>Gagal memuat data aktivitas.</div>
-                    ) : (aktivitas?.pengabdian ?? []).length === 0 ? (
-                        <div style={S.empty}>Belum ada pengabdian masyarakat.</div>
-                    ) : (aktivitas?.pengabdian ?? []).map((p, i) => {
-                        const href = reviewHref('pengabdian', p);
-                        return (
-                        <div key={i} style={{ ...S.item, cursor: href ? 'pointer' : 'default' }} onClick={() => openReview('pengabdian', p)}>
-                            <div>
-                                <div style={{ fontSize: 13, fontWeight: 600 }}>{p.judul}</div>
-                                <div style={{ fontSize: 11, color: '#9ca3af' }}>{p.lokasi} · {p.tahun}</div>
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>{statusBadge(p.status)}<ReviewTag show={!!href} /></div>
                         </div>

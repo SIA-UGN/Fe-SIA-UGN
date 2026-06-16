@@ -126,15 +126,7 @@ export const validasiProposal = async (id, body) => {
     return res.data;
 };
 
-// ── Pengabdian Masyarakat ─────────────────────────────────────────────────────
-export const getPengabdianManager = async () => {
-    const res = await api.get('/manager/pengabdian');
-    return res.data;
-};
-export const validasiPengabdian = async (id, payload) => {
-    const res = await api.put(`/manager/pengabdian/${id}/validasi`, toStatusBody(payload));
-    return res.data;
-};
+// [KELOMPOK 1] Pengabdian Masyarakat = modul kelompok lain, tidak dimasukkan ke merge ini.
 
 // ── Kegiatan Pengajar ─────────────────────────────────────────────────────────
 export const getKegiatanManager = async () => {

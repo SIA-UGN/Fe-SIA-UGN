@@ -215,7 +215,7 @@ export default function AdminDashboard() {
     { // [KELOMPOK 1] Pintu masuk validasi aktivitas dosen (BKD, kegiatan, penelitian, pengabdian)
       id: 'manage-dosen-validasi',
       title: 'Validasi Aktivitas Dosen',
-      description: 'Tinjau & validasi BKD, kegiatan mengajar, penelitian, pengabdian',
+      description: 'Tinjau & validasi BKD, kegiatan mengajar, penelitian',
       icon: <TeacherIcon />,
       action: () => handleCardClick('manage-dosen-validasi')
     },

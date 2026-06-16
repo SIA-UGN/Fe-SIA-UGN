@@ -137,7 +137,6 @@ const NavbarMenu = forwardRef(({ className, isMobileMenuOpen, setIsMobileMenuOpe
             <MobileNavMenuItem href="/dosen/kegiatan-mengajar" onClick={() => setIsMobileMenuOpen(false)}>Kegiatan Mengajar</MobileNavMenuItem>
             <MobileNavMenuItem href="/dosen/penelitian" onClick={() => setIsMobileMenuOpen(false)}>Penelitian</MobileNavMenuItem>
             <MobileNavMenuItem href="/dosen/publikasi" onClick={() => setIsMobileMenuOpen(false)}>Publikasi Ilmiah</MobileNavMenuItem>
-            <MobileNavMenuItem href="/dosen/pengabdian" onClick={() => setIsMobileMenuOpen(false)}>Pengabdian Masyarakat</MobileNavMenuItem>
             <MobileNavMenuItem href="/dosen/angka-kredit" onClick={() => setIsMobileMenuOpen(false)}>Angka Kredit</MobileNavMenuItem>
             <MobileNavMenuItem href="/administrasi/payroll" onClick={() => setIsMobileMenuOpen(false)}>Gaji</MobileNavMenuItem>
           </>

@@ -4,7 +4,7 @@
 // Pola disalin dari LibraryDropdown (org) agar konsisten styling & kompatibel.
 import { useState } from 'react';
 import Link from 'next/link';
-import { BookOpen, FlaskConical, BookMarked, Heart, Star, Banknote, ChevronDown } from 'lucide-react';
+import { BookOpen, FlaskConical, BookMarked, Star, Banknote, ChevronDown } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,7 +16,6 @@ const ITEMS = [
   { href: '/dosen/kegiatan-mengajar', label: 'Kegiatan Mengajar', icon: BookOpen },
   { href: '/dosen/penelitian', label: 'Penelitian', icon: FlaskConical },
   { href: '/dosen/publikasi', label: 'Publikasi Ilmiah', icon: BookMarked },
-  { href: '/dosen/pengabdian', label: 'Pengabdian Masyarakat', icon: Heart },
   { href: '/dosen/angka-kredit', label: 'Angka Kredit', icon: Star },
   { href: '/administrasi/payroll', label: 'Gaji', icon: Banknote },
 ];
