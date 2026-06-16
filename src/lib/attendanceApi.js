@@ -243,6 +243,51 @@ export const getStudentActiveQR = async (scheduleId) => {
 };
 
 // ========================================
+// GPS CHECK-IN DOSEN
+// ========================================
+
+/**
+ * GPS Check-in presensi dosen
+ * @param {number} latitude - Koordinat lintang
+ * @param {number} longitude - Koordinat bujur
+ * @param {number|null} id_schedule - ID jadwal (opsional)
+ * @param {string|null} keterangan - Keterangan (opsional)
+ * @returns {Promise} - Check-in result
+ */
+export const checkInGPS = async (latitude, longitude, id_schedule = null, keterangan = null) => {
+    try {
+        const payload = { latitude, longitude };
+        if (id_schedule) payload.id_schedule = id_schedule;
+        if (keterangan) payload.keterangan = keterangan;
+        const response = await api.post('/lecturer/attendance/check-in', payload);
+        return response.data;
+    } catch (error) {
+        throw (error.response?.data ?? error);
+    }
+};
+
+/**
+ * Ambil id_schedule list yang sudah dihadiri dosen untuk suatu kelas.
+ * Memanggil endpoint presensi dosen; fallback ke [] jika endpoint belum ada.
+ * @param {number[]} scheduleIds - Array id_schedule dari kelas ini
+ * @returns {Promise<number[]>} - Array id_schedule yang sudah dihadiri
+ */
+export const getLecturerAttendedSchedules = async (scheduleIds) => {
+    try {
+        if (!scheduleIds || scheduleIds.length === 0) return [];
+        const params = scheduleIds.map(id => `id_schedules[]=${id}`).join('&');
+        const response = await api.get(`/lecturer/attendance/check-in/history?${params}`);
+        if (response.data?.status === 'success') {
+            return response.data.data?.attended_schedule_ids ?? [];
+        }
+        return [];
+    } catch {
+        // Endpoint belum tersedia di BE → semua tampil tombol "Input Presensi"
+        return [];
+    }
+};
+
+// ========================================
 // ACADEMIC PERIODS API
 // ========================================
 
