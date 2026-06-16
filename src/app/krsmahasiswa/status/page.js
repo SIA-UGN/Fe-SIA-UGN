@@ -62,8 +62,10 @@ function getLecturerName(lecturers = []) {
  * A8 mengembalikan array entri per-mata kuliah, masing-masing punya status sendiri.
  */
 function mapKrsItemToCourse(item) {
-  const subject = item?.subject ?? {};
-  const krsClass = item?.krsClass ?? {};
+  // BE Laravel men-serialize relasi sebagai snake_case (krs_class, academic_period).
+  // Dukung kedua bentuk agar tahan terhadap perbedaan endpoint/serialisasi.
+  const krsClass = item?.krsClass ?? item?.krs_class ?? {};
+  const subject = item?.subject ?? krsClass?.subject ?? {};
 
   return {
     id_krs: item?.id_krs,
@@ -240,9 +242,19 @@ export default function KrsStatusPage() {
     if (fetchError) {
       setError(fetchError.message);
     } else {
-      const list = Array.isArray(data?.data) ? data.data : [];
+      // BE GET /student/krs mengembalikan { data: { academic_period, summary, krs: [...] } }.
+      // Entri ada di data.data.krs — bukan langsung data.data. Fallback ke array datar
+      // bila suatu saat BE mengembalikan bentuk lama.
+      const payload = data?.data;
+      const list = Array.isArray(payload?.krs)
+        ? payload.krs
+        : Array.isArray(payload)
+          ? payload
+          : [];
       setCourses(list.map(mapKrsItemToCourse));
-      setAcademicPeriod(list[0]?.academicPeriod?.name ?? null);
+      setAcademicPeriod(
+        payload?.academic_period?.name ?? list[0]?.academicPeriod?.name ?? null
+      );
     }
 
     if (silent) {

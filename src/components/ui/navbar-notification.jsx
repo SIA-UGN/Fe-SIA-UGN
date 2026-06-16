@@ -339,6 +339,8 @@ const NavbarNotification = forwardRef(({ className, isChatOpen, setChatUser, set
                     } catch (err) {
                       console.error('Error fetching conversation:', err);
                     }
+                  } else if (notification.type === 'krs') {
+                    router.push('/krsmahasiswa/status');
                   } else if (thesisTarget) {
                     router.push(thesisTarget.href);
                   } else {
@@ -355,13 +357,21 @@ const NavbarNotification = forwardRef(({ className, isChatOpen, setChatUser, set
                           backgroundColor:
                             notification.type === 'chat'
                               ? '#DABC4E'
-                              : thesisTarget
-                                ? '#16874B'
-                                : '#015023',
+                              : notification.type === 'krs'
+                                ? '#BE0414'
+                                : thesisTarget
+                                  ? '#16874B'
+                                  : '#015023',
                           color: 'white'
                         }}
                       >
-                        {notification.type === 'chat' ? 'Chat' : thesisTarget ? 'TA' : 'Info'}
+                        {notification.type === 'chat'
+                          ? 'Chat'
+                          : notification.type === 'krs'
+                            ? 'KRS'
+                            : thesisTarget
+                              ? 'TA'
+                              : 'Info'}
                       </div>
                       <p className="font-semibold text-sm line-clamp-1" style={{ color: 'brand-green', fontFamily: 'Urbanist, sans-serif' }}>
                         {notification.title}
