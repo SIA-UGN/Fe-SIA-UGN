@@ -167,6 +167,9 @@ export default function AdminDashboard() {
       case 'approval-krs':
         router.push('/adminpage/approvalKRS');
         break;
+      case 'manage-dosen-validasi': // [KELOMPOK 1]
+        router.push('/manager/dosen');
+        break;
       default:
         console.log('Unknown action type');
     }
@@ -208,6 +211,13 @@ export default function AdminDashboard() {
       description: 'Tambahkan dosen baru ke dalam sistem',
       icon: <TeacherIcon />,
       action: () => handleCardClick('manage-teacher')
+    },
+    { // [KELOMPOK 1] Pintu masuk validasi aktivitas dosen (BKD, kegiatan, penelitian, pengabdian)
+      id: 'manage-dosen-validasi',
+      title: 'Validasi Aktivitas Dosen',
+      description: 'Tinjau & validasi BKD, kegiatan mengajar, penelitian',
+      icon: <TeacherIcon />,
+      action: () => handleCardClick('manage-dosen-validasi')
     },
     {
       id: 'manage-period',

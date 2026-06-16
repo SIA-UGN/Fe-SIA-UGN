@@ -2,534 +2,527 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { getClassDetail, sendManualAttendance, getPresencesBySchedule, deletePresence } from '@/lib/attendanceApi';
-import { getPermissionForAScheduleInAClass } from '@/lib/permissionApi';
-import { ErrorMessageBoxWithButton } from '@/components/ui/message-box';
-import { AlertConfirmationDialog, AlertSuccessDialog, AlertErrorDialog } from '@/components/ui/alert-dialog';
+import { getClassSchedules, checkInGPS, getLecturerAttendedSchedules } from '@/lib/attendanceApi';
+import { AlertSuccessDialog, AlertErrorDialog } from '@/components/ui/alert-dialog';
 import Navbar from '@/components/ui/navigation-menu';
-import DataTable from '@/components/ui/table';
-import { ArrowLeft, CalendarDays, Save, QrCode } from 'lucide-react';
-import { PrimaryButton, WarningButton } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import Footer from '@/components/ui/footer';
 import LoadingEffect from '@/components/ui/loading-effect';
+import { ErrorMessageBoxWithButton } from '@/components/ui/message-box';
+import {
+    ArrowLeft, CalendarDays, MapPin, Clock, Navigation,
+    CheckCircle2, XCircle, Loader2, Building2, AlertTriangle,
+    WifiOff, Settings
+} from 'lucide-react';
 
-export default function InputPresensiPage() {
+const GPS_STATUS = {
+    IDLE: 'idle',
+    LOADING: 'loading',
+    READY: 'ready',           // Koordinat OK, siap kirim ke BE
+    SAVING: 'saving',         // Sedang kirim ke BE
+    SUCCESS: 'success',       // BE konfirmasi dalam radius
+    FAILED: 'failed',         // BE konfirmasi luar radius
+    LOW_ACCURACY: 'low_accuracy',
+    PERMISSION_DENIED: 'permission_denied',
+    TIMEOUT: 'timeout',
+    ERROR: 'error',
+};
+
+export default function InputPresensiGPSPage() {
     const router = useRouter();
     const params = useParams();
     const id_schedule = params.pertemuan;
     const id_class = params.kode;
 
-    // State management
-    const [mahasiswaData, setMahasiswaData] = useState([]);
-    const [originalAttendance, setOriginalAttendance] = useState([]);
-    const [isLoading, setIsLoading] = useState(false);
-    const [isSaving, setIsSaving] = useState(false);
-    const [isScanning, setIsScanning] = useState(false);
-    const [permissionChecked, setPermissionChecked] = useState(false);
-    const [permissionGranted, setPermissionGranted] = useState(null);
-    const [loadingPermission, setLoadingPermission] = useState(true);
-    const [countdown, setCountdown] = useState(5);
-    const [classInfo, setClassInfo] = useState({
-        code_subject: '-',
-        name_subject: '-',
-        code_class: '-',
-        dosen: '-'
-    });
-    const [scheduleInfo, setScheduleInfo] = useState({
-        pertemuanke: '-',
-        date: '',
-    });
-    const [statistics, setStatistics] = useState({
-        total_students: 0,
-        present_students: 0,
-        absent_students: 0
-    });
-    const [errors, setErrors] = useState({});
+    const [isLoading, setIsLoading] = useState(true);
+    const [fetchError, setFetchError] = useState(null);
+    const [scheduleInfo, setScheduleInfo] = useState(null);
+    const [classInfo, setClassInfo] = useState(null);
+    const [alreadyAttended, setAlreadyAttended] = useState(false);  // dosen sudah hadir utk pertemuan ini
 
-    // Alert states
-    const [showConfirmDialog, setShowConfirmDialog] = useState(false);
-    const [showSuccessDialog, setShowSuccessDialog] = useState(false);
-    const [showErrorDialog, setShowErrorDialog] = useState(false);
-    const [alertMessage, setAlertMessage] = useState('');
-    const [confirmAction, setConfirmAction] = useState(null);
+    const [gpsStatus, setGpsStatus] = useState(GPS_STATUS.IDLE);
+    const [gpsCoords, setGpsCoords] = useState(null);   // { lat, lng, accuracy }
+    const [gpsResult, setGpsResult] = useState(null);   // response.data dari BE
+    const [distanceMeter, setDistanceMeter] = useState(null);
+    const [failReason, setFailReason] = useState(null);   // pesan asli dari BE saat gagal
 
-    // Check permission on mount
-    useEffect(() => {
-        if (id_class) {
-            checkPermission();
-        }
-    }, [id_class]);
+    const [showSuccess, setShowSuccess] = useState(false);
+    const [showError, setShowError] = useState(false);
+    const [alertMsg, setAlertMsg] = useState('');
 
-    // Fetch data after permission is granted
-    useEffect(() => {
-        if (permissionChecked && permissionGranted) {
-            fetchAllData();
-        }
-    }, [permissionChecked, permissionGranted]);
+    useEffect(() => { if (id_class) fetchScheduleInfo(); }, [id_class]);
 
-    // Countdown redirect effect when permission is denied
-    useEffect(() => {
-        let timer;
-        if (permissionGranted === false) {
-            if (countdown > 0) {
-                timer = setTimeout(() => setCountdown(prev => prev - 1), 1000);
-            } else {
-                handleBack();
-            }
-        }
-        return () => clearTimeout(timer);
-    }, [permissionGranted, countdown]);
-
-    // Check Permission
-    const checkPermission = async () => {
-        setErrors(prev => ({...prev, permission: null}));
-        setLoadingPermission(true);
-        try {
-            const response = await getPermissionForAScheduleInAClass(id_class, id_schedule);
-            if (response.status === 'success') {
-                if (response.data.permission === false) {
-                    setPermissionGranted(false);
-                    setPermissionChecked(true);
-                } else {
-                    setPermissionGranted(true);
-                    setPermissionChecked(true);
-                }
-            } else {
-                setErrors(prev => ({...prev, permission: 'Gagal memeriksa izin akses: ' + response.message}));
-            }
-        } catch (error) {
-            setErrors(prev => ({...prev, permission: 'Gagal memeriksa izin akses: ' + error.message}));
-        } finally {
-            setLoadingPermission(false);
-        }
-    };
-
-    // Fetch All Data
-    const fetchAllData = async () => {
-        setErrors(prev => ({...prev, fetch: null}));
+    const fetchScheduleInfo = async () => {
         setIsLoading(true);
-        await Promise.all([
-            fetchClassDetail(),
-            fetchAttendanceData()
-        ]);
-        setIsLoading(false);
-    };
-
-    // Fetch class detail with students list
-    const fetchClassDetail = async () => {
-        setErrors(prev => ({...prev, fetch: null}));
+        setFetchError(null);
         try {
-            const response = await getClassDetail(id_class);
-            
-            if (response.status === 'success') {
-                setClassInfo(response.data.class_info);
+            const res = await getClassSchedules(id_class);
+            if (res.status === 'success') {
+                setClassInfo(res.data.class_info);
+                const found = res.data.schedules?.find(
+                    s => String(s.id_schedule) === String(id_schedule)
+                );
+                setScheduleInfo(found || null);
+                // Cek apakah dosen sudah hadir untuk pertemuan ini → tampilkan status, bukan minta check-in ulang
+                try {
+                    const attended = await getLecturerAttendedSchedules([Number(id_schedule)]);
+                    if (Array.isArray(attended) && attended.map(Number).includes(Number(id_schedule))) {
+                        setAlreadyAttended(true);
+                    }
+                } catch { /* abaikan — fallback ke flow check-in normal */ }
             } else {
-                setErrors(prev => ({...prev, fetch: 'Gagal memuat data kelas: ' + response.message}));
+                setFetchError(res.message || 'Gagal memuat data jadwal.');
             }
-        } catch (error) {
-            setErrors(prev => ({...prev, fetch: 'Terjadi kesalahan saat memuat data kelas: ' + error.message}));
+        } catch (err) {
+            setFetchError(err?.message || 'Terjadi kesalahan saat memuat data.');
+        } finally {
+            setIsLoading(false);
         }
     };
 
-    // Fetch attendance data
-    const fetchAttendanceData = async () => {
-        setErrors(prev => ({...prev, fetch: null}));
-        try {
-            const response = await getPresencesBySchedule(id_schedule);
-            
-            if (response.status === 'success') {
-                // Set schedule info dari response
-                setScheduleInfo({
-                    pertemuanke: response.data.pertemuan || '-',
-                    date: response.data.tanggal || ''
-                });
+    const formatJam = (t) => (t ? t.substring(0, 5) : '-');
+    const formatHari = (dateStr) => {
+        if (!dateStr) return '-';
+        const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+        return days[new Date(dateStr).getDay()];
+    };
 
-                // Ambil ID mahasiswa yang sudah hadir dari database
-                const attendedStudentIds = response.data.students.map(s => s.id_user_si);
-                
-                // Simpan data asli dari database untuk comparison nanti
-                setOriginalAttendance(attendedStudentIds);
-                
-                // Fetch class detail untuk mendapatkan daftar mahasiswa
-                const classData = await getClassDetail(response.data.id_class);
-                
-                if (classData.status === 'success') {
-                    // Transform data ke format yang sesuai dengan table
-                    const formattedData = classData.data.students.map(student => ({
-                        id: student.id_user_si,
-                        nim: student.nim,
-                        nama: student.name,
-                        hadir: attendedStudentIds.includes(student.id_user_si),
-                    }));
-                    
-                    setMahasiswaData(formattedData);
 
-                    // Update statistics
-                    setStatistics({
-                        total_students: formattedData.length,
-                        present_students: attendedStudentIds.length,
-                        absent_students: formattedData.length - attendedStudentIds.length
-                    });
+
+    const handleDeteksiLokasi = () => {
+        setGpsStatus(GPS_STATUS.LOADING);
+        setGpsCoords(null);
+        setGpsResult(null);
+        setDistanceMeter(null);
+
+
+
+        if (!navigator.geolocation) {
+            setGpsStatus(GPS_STATUS.ERROR);
+            return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+            async (pos) => {
+                const { latitude: lat, longitude: lng, accuracy } = pos.coords;
+
+                // Cek akurasi: toleransi 500m (laptop pakai WiFi positioning, bukan GPS chip)
+                if (accuracy > 500) {
+                    setGpsStatus(GPS_STATUS.LOW_ACCURACY);
+                    setGpsCoords({ lat, lng, accuracy });
+                    return;
                 }
-            } else {
-                setErrors(prev => ({...prev, fetch: 'Gagal memuat data presensi: ' + response.message}));
-            }
-        } catch (error) {
-            setErrors(prev => ({...prev, fetch: 'Terjadi kesalahan saat memuat data presensi: ' + error.message}));
-        }
+
+                setGpsCoords({ lat, lng, accuracy });
+                setGpsStatus(GPS_STATUS.SAVING);
+
+                try {
+                    const res = await checkInGPS(lat, lng, Number(id_schedule));
+                    if (res.status === 'success') {
+                        setGpsResult(res.data);
+                        setDistanceMeter(res.data?.distance_meter ?? null);
+                        setFailReason(null);
+                        setGpsStatus(GPS_STATUS.SUCCESS);
+                    } else {
+                        setDistanceMeter(res.data?.distance_meter ?? null);
+                        setFailReason(res.message ?? null);
+                        setGpsStatus(GPS_STATUS.FAILED);
+                    }
+                } catch (err) {
+                    setDistanceMeter(err?.data?.distance_meter ?? null);
+                    setFailReason(err?.message ?? err?.userMessage ?? err?.data?.message ?? null);
+                    setGpsStatus(GPS_STATUS.FAILED);
+                }
+            },
+            (err) => {
+                if (err.code === 1) setGpsStatus(GPS_STATUS.PERMISSION_DENIED);
+                else if (err.code === 3) setGpsStatus(GPS_STATUS.TIMEOUT);
+                else setGpsStatus(GPS_STATUS.ERROR);
+            },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
     };
 
-// Handle scan QR
-const handleScanQR = () => {
-    setIsScanning(true);
-    router.push(`/kehadiran/${id_class}/pertemuan/${id_schedule}/scanqr`);
-};
+    const handleCatatKehadiran = () => {
+        setAlertMsg(
+            `Presensi berhasil dicatat!\n\nKampus: ${gpsResult?.nama_kampus || '-'}\nJarak: ${gpsResult?.distance_meter ? Math.round(gpsResult.distance_meter) + ' meter' : '-'}`
+        );
+        setShowSuccess(true);
+    };
 
-// Format tanggal
-const formatTanggal = (dateString) => {
-if (!dateString) return '-';
-const date = new Date(dateString);
-const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
-const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+    const handleSuccessClose = () => {
+        setShowSuccess(false);
+        router.push(`/kehadiran/${id_class}`);
+    };
 
-const dayName = days[date.getDay()];
-const day = date.getDate();
-const month = months[date.getMonth()];
-const year = date.getFullYear();
+    const handleBack = () => router.push(`/kehadiran/${id_class}`);
 
-return `${dayName}, ${day} ${month} ${year}`;
-};
-
-// Toggle presensi (tanpa konfirmasi, langsung update state)
-const togglePresensi = (id) => {
-    setMahasiswaData(prevData =>
-        prevData.map(item =>
-            item.id === id ? { ...item, hadir: !item.hadir } : item
-        )
+    if (isLoading) return <LoadingEffect message="Memuat data jadwal..." />;
+    if (fetchError) return (
+        <div className="min-h-screen bg-brand-light-sage">
+            <Navbar />
+            <div className="container mx-auto px-4 py-8 max-w-3xl">
+                <ErrorMessageBoxWithButton message={fetchError} action={fetchScheduleInfo} back actionback={handleBack} />
+            </div>
+        </div>
     );
-};
 
-// Simpan semua presensi
-const handleSaveAll = async () => {
-    if (mahasiswaData.length === 0) {
-        setAlertMessage('Tidak ada data mahasiswa untuk disimpan');
-        setShowErrorDialog(true);
-        return;
-    }
+    const hari = scheduleInfo ? formatHari(scheduleInfo.tanggal) : '-';
+    const jamMulai = scheduleInfo ? formatJam(scheduleInfo.jam_mulai) : '-';
+    const jamSelesai = scheduleInfo ? formatJam(scheduleInfo.jam_selesai) : '-';
+    const gedung = scheduleInfo?.gedung || classInfo?.gedung || '-';
+    const ruang = scheduleInfo?.ruang || classInfo?.ruang || '-';
+    const lokasiLabel = (gedung !== '-' || ruang !== '-') ? `${gedung} — ${ruang}` : 'Informasi lokasi tidak tersedia';
+    const pertemuanKe = scheduleInfo?.pertemuan_ke ?? id_schedule;
 
-    // Calculate changes
-    const currentAttendedIds = mahasiswaData.filter(m => m.hadir === true).map(m => m.id);
-    const toAdd = currentAttendedIds.filter(id => !originalAttendance.includes(id));
-    const toDelete = originalAttendance.filter(id => !currentAttendedIds.includes(id));
-    
-    const hadirCount = currentAttendedIds.length;
-    const totalCount = mahasiswaData.length;
-    
-    // Build confirmation message with details
-    let message = `Anda akan menyimpan presensi untuk ${hadirCount} mahasiswa hadir dari total ${totalCount} mahasiswa.`;
-    
-    if (toAdd.length > 0 || toDelete.length > 0) {
-        message += '\n\nPerubahan:';
-        if (toAdd.length > 0) message += `\n• Menambah ${toAdd.length} presensi baru`;
-        if (toDelete.length > 0) message += `\n• Menghapus ${toDelete.length} presensi`;
-    }
-    
-    message += '\n\nLanjutkan?';
-    
-    setAlertMessage(message);
-    setConfirmAction(() => async () => {
-        setShowConfirmDialog(false);
-        await savePresences();
-    });
-    setShowConfirmDialog(true);
-};
-
-const savePresences = async () => {
-    setIsSaving(true);
-    setErrors(prev => ({...prev, save: null}));
-    try {
-        // Current state: mahasiswa yang dicentang sekarang
-        const currentAttendedIds = mahasiswaData
-            .filter(m => m.hadir === true)
-            .map(m => m.id);
-        
-        // Mahasiswa yang perlu ditambah (dicentang sekarang tapi belum di DB)
-        const toAdd = currentAttendedIds.filter(id => !originalAttendance.includes(id));
-        
-        // Mahasiswa yang perlu dihapus (ada di DB tapi sekarang tidak dicentang)
-        const toDelete = originalAttendance.filter(id => !currentAttendedIds.includes(id));
-
-        // Execute delete operations first
-        if (toDelete.length > 0) {
-            await Promise.all(
-                toDelete.map(studentId => deletePresence(id_schedule, studentId))
+    // ── Render GPS Status Area ──────────────────────────────────
+    const renderGpsArea = () => {
+        // Sudah hadir → tampilkan status, jangan minta check-in ulang (BE akan tolak 409)
+        if (alreadyAttended && gpsStatus !== GPS_STATUS.SUCCESS) {
+            return (
+                <>
+                    <div className="w-20 h-20 rounded-full flex items-center justify-center mb-4" style={{ backgroundColor: '#dcfce7', border: '2px solid #86efac' }}>
+                        <CheckCircle2 className="w-10 h-10" style={{ color: '#16a34a' }} />
+                    </div>
+                    <p className="text-lg font-bold mb-1" style={{ color: '#16a34a', fontFamily: 'Urbanist, sans-serif' }}>Anda Sudah Hadir</p>
+                    <p className="text-sm text-center mb-6 max-w-xs" style={{ color: '#6b7280' }}>
+                        Presensi untuk pertemuan ini sudah tercatat. Tidak perlu melakukan check-in ulang.
+                    </p>
+                    <button
+                        onClick={handleBack}
+                        className="flex items-center gap-2 px-8 py-3 text-white font-semibold rounded-xl transition hover:opacity-90 shadow"
+                        style={{ backgroundColor: '#015023', fontFamily: 'Urbanist, sans-serif' }}
+                    >
+                        <ArrowLeft className="w-5 h-5" /> Kembali Ke Daftar Pertemuan
+                    </button>
+                </>
             );
         }
+        switch (gpsStatus) {
+            case GPS_STATUS.IDLE:
+                return (
+                    <>
+                        <div className="w-20 h-20 rounded-full flex items-center justify-center mb-4" style={{ backgroundColor: '#f3f4f6' }}>
+                            <MapPin className="w-9 h-9" style={{ color: '#9ca3af' }} />
+                        </div>
+                        <p className="text-lg font-bold mb-1" style={{ color: '#015023', fontFamily: 'Urbanist, sans-serif' }}>Lokasi Belum Aktif</p>
+                        <p className="text-sm text-center mb-6 max-w-xs" style={{ color: '#6b7280' }}>
+                            Klik tombol di bawah untuk mengaktifkan akses GPS<br />dan memverifikasi lokasi Anda saat ini
+                        </p>
+                        <BtnDeteksi onClick={handleDeteksiLokasi} />
+                    </>
+                );
 
-        // Then save current attendance (will create new or update existing)
-        if (currentAttendedIds.length > 0) {
-            await sendManualAttendance(id_schedule, currentAttendedIds);
+            case GPS_STATUS.LOADING:
+            case GPS_STATUS.SAVING:
+                return (
+                    <>
+                        <div className="w-20 h-20 rounded-full flex items-center justify-center mb-4" style={{ backgroundColor: '#e8f5e9' }}>
+                            <Loader2 className="w-9 h-9 animate-spin" style={{ color: '#015023' }} />
+                        </div>
+                        <p className="text-lg font-bold mb-1" style={{ color: '#015023', fontFamily: 'Urbanist, sans-serif' }}>
+                            {gpsStatus === GPS_STATUS.SAVING ? 'Memverifikasi Lokasi...' : 'Mendeteksi Lokasi...'}
+                        </p>
+                        <p className="text-sm" style={{ color: '#6b7280' }}>Mohon tunggu sebentar</p>
+                    </>
+                );
+
+            case GPS_STATUS.SUCCESS:
+                return (
+                    <>
+                        <div className="w-20 h-20 rounded-full flex items-center justify-center mb-4" style={{ backgroundColor: '#dcfce7', border: '2px solid #86efac' }}>
+                            <CheckCircle2 className="w-10 h-10" style={{ color: '#16a34a' }} />
+                        </div>
+                        <p className="text-lg font-bold mb-1" style={{ color: '#16a34a', fontFamily: 'Urbanist, sans-serif' }}>Lokasi Terverifikasi!</p>
+                        <p className="text-sm mb-1" style={{ color: '#374151' }}>
+                            Anda berada dalam jangkauan <strong>{gpsResult?.nama_kampus || gedung}</strong>
+                        </p>
+                        {distanceMeter !== null && (
+                            <p className="text-sm font-semibold mb-5" style={{ color: '#16a34a' }}>
+                                Jarak dari gedung: {Math.round(distanceMeter)} meter
+                            </p>
+                        )}
+                        {/* Detail Lokasi card */}
+                        <div className="w-full rounded-xl p-4 mb-6 text-left text-sm" style={{ backgroundColor: '#f0faf4', border: '1px solid #c6e8d4' }}>
+                            {gpsCoords && (
+                                <p style={{ color: '#015023' }}>Koordinat: <span className="font-medium">{gpsCoords.lat.toFixed(6)}, {gpsCoords.lng.toFixed(6)}</span></p>
+                            )}
+                            {gpsCoords?.accuracy && (
+                                <p className="mt-1" style={{ color: '#16a34a' }}>Akurasi GPS: <span className="font-semibold">±{Math.round(gpsCoords.accuracy)} meter</span></p>
+                            )}
+                            <p className="mt-1" style={{ color: '#16a34a' }}>Status: <span className="font-semibold">Dalam radius gedung ✓</span></p>
+                        </div>
+                        <button
+                            onClick={handleCatatKehadiran}
+                            className="flex items-center gap-2 px-8 py-3 text-white font-semibold rounded-xl transition hover:opacity-90 shadow"
+                            style={{ backgroundColor: '#015023', fontFamily: 'Urbanist, sans-serif' }}
+                        >
+                            <Navigation className="w-5 h-5" />
+                            Catat Kehadiran
+                        </button>
+                    </>
+                );
+
+            case GPS_STATUS.FAILED: {
+                const isRadiusIssue = !!failReason && /radius|lokasi|kampus/i.test(failReason);
+                return (
+                    <>
+                        <div className="w-20 h-20 rounded-full flex items-center justify-center mb-4" style={{ backgroundColor: '#fee2e2', border: '2px solid #fca5a5' }}>
+                            <XCircle className="w-10 h-10" style={{ color: '#dc2626' }} />
+                        </div>
+                        <p className="text-lg font-bold mb-1" style={{ color: '#dc2626', fontFamily: 'Urbanist, sans-serif' }}>
+                            {isRadiusIssue ? 'Lokasi Tidak Sesuai' : 'Presensi Gagal'}
+                        </p>
+                        {distanceMeter !== null && (
+                            <p className="text-sm font-semibold mb-2" style={{ color: '#dc2626' }}>
+                                Jarak dari titik kampus: {Math.round(distanceMeter)} meter
+                            </p>
+                        )}
+                        <div className="w-full rounded-xl p-4 mb-6 text-left text-sm" style={{ backgroundColor: '#fee2e2', border: '1px solid #fca5a5' }}>
+                            <p className="font-semibold mb-1" style={{ color: '#dc2626' }}>Presensi Tidak Dapat Dicatat</p>
+                            <p style={{ color: '#7f1d1d' }}>
+                                {failReason || 'Terjadi kendala saat mencatat presensi. Silakan coba lagi.'}
+                            </p>
+                        </div>
+                        <BtnCobaLagi onClick={handleDeteksiLokasi} />
+                    </>
+                );
+            }
+
+            case GPS_STATUS.LOW_ACCURACY:
+                return (
+                    <>
+                        <div className="w-20 h-20 rounded-full flex items-center justify-center mb-4" style={{ backgroundColor: '#fee2e2', border: '2px solid #fca5a5' }}>
+                            <Settings className="w-10 h-10" style={{ color: '#dc2626' }} />
+                        </div>
+                        <p className="text-lg font-bold mb-1" style={{ color: '#dc2626', fontFamily: 'Urbanist, sans-serif' }}>Akurasi Rendah</p>
+                        <p className="text-sm text-center mb-1" style={{ color: '#374151' }}>Sinyal GPS terlalu lemah untuk memverifikasi lokasi Anda secara akurat.</p>
+                        {gpsCoords?.accuracy && (
+                            <p className="text-sm font-semibold mb-5" style={{ color: '#dc2626' }}>
+                                Akurasi saat ini: <span>±{Math.round(gpsCoords.accuracy)} meter</span>{' '}
+                                <span style={{ color: '#9ca3af', fontWeight: 400 }}>(dibutuhkan &lt;100m)</span>
+                            </p>
+                        )}
+                        <div className="w-full rounded-xl p-4 mb-6 text-left text-sm" style={{ backgroundColor: '#fee2e2', border: '1px solid #fca5a5' }}>
+                            <p className="font-semibold mb-2" style={{ color: '#dc2626' }}>Cara Meningkatkan Akurasi</p>
+                            <ol className="list-decimal list-inside space-y-1" style={{ color: '#7f1d1d' }}>
+                                <li>Pindah ke area yang lebih terbuka atau dekat jendela</li>
+                                <li>Tunggu beberapa detik lalu coba lagi agar satelit terkunci</li>
+                                <li>Hindari area dalam ruangan tertutup saat pertama kali aktivasi</li>
+                            </ol>
+                        </div>
+                        <BtnCobaLagi onClick={handleDeteksiLokasi} />
+                    </>
+                );
+
+            case GPS_STATUS.PERMISSION_DENIED:
+                return (
+                    <>
+                        <div className="w-20 h-20 rounded-full flex items-center justify-center mb-4" style={{ backgroundColor: '#fefce8', border: '2px solid #fde68a' }}>
+                            <AlertTriangle className="w-10 h-10" style={{ color: '#ca8a04' }} />
+                        </div>
+                        <p className="text-lg font-bold mb-1" style={{ color: '#ca8a04', fontFamily: 'Urbanist, sans-serif' }}>Izin Lokasi Ditolak</p>
+                        <p className="text-sm text-center mb-5" style={{ color: '#374151' }}>
+                            Anda menolak izin akses lokasi. Presensi dosen<br />memerlukan akses lokasi.
+                        </p>
+                        <div className="w-full rounded-xl p-4 mb-6 text-left text-sm" style={{ backgroundColor: '#fefce8', border: '1px solid #fde68a' }}>
+                            <p className="font-semibold mb-2" style={{ color: '#ca8a04' }}>Cara Mengaktifkan Izin</p>
+                            <ol className="list-decimal list-inside space-y-1" style={{ color: '#713f12' }}>
+                                <li>Klik ikon gembok/info di bilah alamat browser</li>
+                                <li>Ubah izin <strong>Lokasi</strong> menjadi <strong>Izinkan</strong></li>
+                                <li>Refresh halaman lalu klik Aktifkan Lokasi kembali</li>
+                            </ol>
+                        </div>
+                        <BtnCobaLagi onClick={handleDeteksiLokasi} />
+                    </>
+                );
+
+            case GPS_STATUS.TIMEOUT:
+                return (
+                    <>
+                        <div className="w-20 h-20 rounded-full flex items-center justify-center mb-4" style={{ backgroundColor: '#f3f4f6', border: '2px solid #d1d5db' }}>
+                            <WifiOff className="w-10 h-10" style={{ color: '#374151' }} />
+                        </div>
+                        <p className="text-lg font-bold mb-1" style={{ color: '#374151', fontFamily: 'Urbanist, sans-serif' }}>Koneksi Internet Buruk</p>
+                        <p className="text-sm text-center mb-5" style={{ color: '#6b7280' }}>
+                            Permintaan GPS timeout. Koneksi internet Anda tidak<br />stabil atau sinyal terlalu lemah.
+                        </p>
+                        <div className="w-full rounded-xl p-4 mb-6 text-left text-sm" style={{ backgroundColor: '#f9fafb', border: '1px solid #e5e7eb' }}>
+                            <p className="font-semibold mb-2" style={{ color: '#374151' }}>Saran Perbaikan</p>
+                            <ol className="list-decimal list-inside space-y-1" style={{ color: '#4b5563' }}>
+                                <li>Periksa koneksi Wi-Fi atau data seluler Anda</li>
+                                <li>Pindah ke area dengan sinyal yang lebih kuat</li>
+                                <li>Jika menggunakan Wi-Fi kampus, pastikan sudah login portal</li>
+                            </ol>
+                        </div>
+                        <BtnCobaLagi onClick={handleDeteksiLokasi} />
+                    </>
+                );
+
+            default: // ERROR
+                return (
+                    <>
+                        <div className="w-20 h-20 rounded-full flex items-center justify-center mb-4" style={{ backgroundColor: '#fef3c7' }}>
+                            <AlertTriangle className="w-10 h-10" style={{ color: '#d97706' }} />
+                        </div>
+                        <p className="text-lg font-bold mb-1" style={{ color: '#d97706', fontFamily: 'Urbanist, sans-serif' }}>GPS Tidak Tersedia</p>
+                        <p className="text-sm text-center mb-6" style={{ color: '#6b7280' }}>Browser Anda tidak mendukung GPS atau terjadi kesalahan tak terduga.</p>
+                        <BtnCobaLagi onClick={handleDeteksiLokasi} />
+                    </>
+                );
         }
+    };
 
-        const response = { status: 'success' };
-        
-        if (response.status === 'success') {
-            setAlertMessage('Presensi berhasil disimpan!');
-            setShowSuccessDialog(true);
-            
-            // Redirect setelah 1.5 detik
-            setTimeout(() => {
-                router.back();
-            }, 1500);
-        } else {
-            setErrors(prev => ({...prev, save: 'Gagal menyimpan presensi: ' + response.message}));
-            setAlertMessage('Gagal menyimpan presensi: ' + response.message);
-            setShowErrorDialog(true);
-        }
-    } catch (error) {
-        setErrors(prev => ({...prev, save: 'Terjadi kesalahan saat menyimpan presensi: ' + error.message}));
-        setAlertMessage('Terjadi kesalahan saat menyimpan presensi: ' + error.message);
-        setShowErrorDialog(true);
-    } finally {
-        setIsSaving(false);
-    }
-};
-
-const columns = [
-{ key: 'nim', label: 'NIM', width: '150px', cellClassName: 'font-medium' },
-{ key: 'nama', label: 'Nama Mahasiswa', className: 'text-left', cellClassName: 'text-left font-medium' },
-{ key: 'hadir', label: 'Hadir', width: '100px', cellClassName: 'text-center' },
-];
-
-const customRender = {
-    hadir: (value, item) => {
-        return (
-        <div className="flex items-center justify-center">
-            <Checkbox
-            checked={item.hadir}
-            onCheckedChange={() => togglePresensi(item.id)}
-            />
-        </div>
-        );
-    },
-};
-
-// Handle back navigation
-const handleBack = () => {
-    router.push('/kehadiran/' + id_class);
-};
-
-// Loading permission check
-if (loadingPermission) {
-    return <LoadingEffect message="Memeriksa izin akses..." />;
-  } else if (permissionGranted === false) {
     return (
-        <div className="min-h-screen bg-brand-light-sage">
+        <div className="min-h-screen bg-brand-light-sage flex flex-col">
             <Navbar />
-            <div className="container mx-auto px-4 py-8 max-w-7xl">
-                <ErrorMessageBoxWithButton
-                    message={'Anda tidak memiliki izin untuk mengakses kelas atau jadwal ini.' + `\n\nAkan dialihkan kembali dalam ${countdown} detik.`}
-                    action={handleBack}
-                    btntext={countdown > 0 ? `Kembali (${countdown})` : 'Kembali'}
-                />
-            </div>
-        </div>
-    );
-  } else if (errors.permission) {
-    return (
-        <div className="min-h-screen bg-brand-light-sage">
-            <Navbar />
-            <div className="container mx-auto px-4 py-8 max-w-7xl">
-                <ErrorMessageBoxWithButton
-                    message={errors.permission}
-                    action={checkPermission}
-                />
-            </div>
-        </div>
-    );
-  } else if (isLoading) {
-    return <LoadingEffect message="Memuat data mahasiswa..." />;
-  } else if (errors.fetch) {
-    return (
-        <div className="min-h-screen bg-brand-light-sage">
-            <Navbar />
-            <div className="container mx-auto px-4 py-8 max-w-7xl">
-                <ErrorMessageBoxWithButton
-                    message={errors.fetch}
-                    action={fetchAllData}
-                    back={true}
-                    actionback={handleBack}
-                />
-            </div>
-        </div>
-    );
-  }return (
-<div className="min-h-screen bg-brand-light-sage flex flex-col">
-    <Navbar />
-    <div className="container mx-auto px-4 py-8 max-w-7xl flex-grow">
-    <button
-        onClick={handleBack}
-        className="flex items-center gap-2 mb-6 font-medium hover:opacity-80 transition"
-        style={{ color: '#015023', fontFamily: 'Urbanist, sans-serif' }}
-    >
-        <ArrowLeft className="w-5 h-5" />
-        Kembali ke Detail Presensi
-    </button>
+            <div className="container mx-auto px-4 py-6 max-w-3xl flex-grow">
 
-    {/* Header */}
-    <div className="bg-white rounded-2xl shadow-lg p-6 mb-6" style={{ borderRadius: '16px' }}>
-        <div className="flex items-start gap-4">
-        <div className="p-4 rounded-xl" style={{ backgroundColor: '#015023' }}>
-            <CalendarDays className="w-8 h-8 text-white" />
-        </div>
-        <div className="flex-1">
-            <h1 className="text-3xl font-bold" style={{ color: '#015023', fontFamily: 'Urbanist, sans-serif' }}>
-            Input Presensi - Pertemuan {scheduleInfo.pertemuanke}
-            </h1>
-            <p className="mt-1 text-lg" style={{ color: '#015023', opacity: 0.75, fontFamily: 'Urbanist, sans-serif' }}>
-            {classInfo.code_subject} - {classInfo.name_subject}
-            </p>
-            <div className="mt-3 flex flex-wrap gap-3">
-            <span className="px-3 py-1 rounded-lg font-medium" style={{ backgroundColor: '#f3f4f6', color: '#015023', fontFamily: 'Urbanist, sans-serif' }}>
-                Kelas: {classInfo.code_class}
-            </span>
-            <span className="px-3 py-1 rounded-lg font-medium" style={{ backgroundColor: '#DABC4E', color: '#015023', fontFamily: 'Urbanist, sans-serif' }}>
-                {formatTanggal(scheduleInfo.date)}
-            </span>
-            {classInfo?.dosen && (
-                <span className="px-3 py-1 rounded-lg font-medium" style={{ backgroundColor: '#DABC4E', color: '#015023', fontFamily: 'Urbanist, sans-serif' }}>
-                    Dosen: {classInfo.dosen}
-                </span>
-            )}
-            </div>
-        </div>
-        </div>
-
-        {/* Summary */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6 pt-6 border-t border-gray-200">
-        <div>
-            <p className="text-sm font-medium" style={{ color: '#015023', opacity: 0.6, fontFamily: 'Urbanist, sans-serif' }}>
-            Total Mahasiswa
-            </p>
-            <p className="text-2xl font-bold" style={{ color: '#015023', fontFamily: 'Urbanist, sans-serif' }}>
-            {mahasiswaData.length} Mahasiswa
-            </p>
-        </div>
-        <div>
-            <p className="text-sm font-medium" style={{ color: '#015023', opacity: 0.6, fontFamily: 'Urbanist, sans-serif' }}>
-            Hadir
-            </p>
-            <p className="text-2xl font-bold" style={{ color: '#16874B', fontFamily: 'Urbanist, sans-serif' }}>
-            {mahasiswaData.filter(m => m.hadir === true).length} Mahasiswa
-            </p>
-        </div>
-        <div>
-            <p className="text-sm font-medium" style={{ color: '#015023', opacity: 0.6, fontFamily: 'Urbanist, sans-serif' }}>
-            Tidak Hadir
-            </p>
-            <p className="text-2xl font-bold" style={{ color: '#BE0414', fontFamily: 'Urbanist, sans-serif' }}>
-            {mahasiswaData.filter(m => m.hadir === false).length} Mahasiswa
-            </p>
-        </div>
-        </div>
-    </div>
-    {/* Tabel Mahasiswa */}
-    {mahasiswaData.length > 0 && (
-        <div className="bg-white rounded-2xl shadow-lg p-6 mb-6" style={{ borderRadius: '16px' }}>
-            <div className="flex items-center justify-between mb-4">
-            <div>
-                <h2 className="text-xl font-bold" style={{ color: '#015023', fontFamily: 'Urbanist, sans-serif' }}>
-                Daftar Mahasiswa
-                </h2>
-                <p className="text-sm mt-1" style={{ color: '#6b7280', fontFamily: 'Urbanist, sans-serif' }}>
-                Centang checkbox untuk menandai mahasiswa hadir
-                </p>
-            </div>
-            
-            <button
-                onClick={handleScanQR}
-                disabled={isScanning}
-                className="flex items-center gap-2 text-white px-6 py-3 transition shadow-sm hover:opacity-90 font-semibold disabled:opacity-50"
-                style={{ backgroundColor: '#015023', borderRadius: '12px', fontFamily: 'Urbanist, sans-serif' }}
-            >
-                <QrCode className="w-5 h-5" />
-                {isScanning ? 'Memulai Scanner...' : 'Mulai Scan QR'}
-            </button>
-            </div>
-            
-            <DataTable
-            columns={columns}
-            data={mahasiswaData}
-            actions={[]}
-            pagination={false}
-            customRender={customRender}
-            />
-        </div>
-    )}
-
-    {/* Actions */}
-    {mahasiswaData.length > 0 && (
-        <div className="bg-white rounded-2xl shadow-lg p-6" style={{ borderRadius: '16px' }}>
-            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="text-sm" style={{ color: '#015023', fontFamily: 'Urbanist, sans-serif' }}>
-                <p className="font-medium">Keterangan:</p>
-                <p className="text-gray-600 mt-1">
-                • Centang checkbox untuk menandai mahasiswa hadir<br />
-                • Gunakan tombol "Mulai Scan QR" untuk presensi otomatis via QR Code
-                </p>
-            </div>
-
-            <div className="flex gap-3">
-                <WarningButton
-                onClick={handleBack}
-                disabled={isSaving}
+                {/* Back */}
+                <button
+                    onClick={handleBack}
+                    className="flex items-center gap-2 mb-5 font-medium hover:opacity-75 transition text-sm"
+                    style={{ color: '#015023', fontFamily: 'Urbanist, sans-serif' }}
                 >
-                Batal
-                </WarningButton>
-                
-                <PrimaryButton
-                onClick={handleSaveAll}
-                disabled={isSaving}
-                className="gap-2"
-                >
-                <Save className="w-4 h-4" />
-                {isSaving ? 'Menyimpan...' : 'Simpan Presensi'}
-                </PrimaryButton>
+                    <ArrowLeft className="w-4 h-4" />
+                    Kembali Ke Detail Presensi
+                </button>
+
+                {/* Header Card */}
+                <div className="bg-white rounded-2xl shadow-md p-6 mb-4">
+                    <div className="flex items-start gap-4">
+                        <div className="p-3 rounded-xl shrink-0" style={{ backgroundColor: '#015023' }}>
+                            <CalendarDays className="w-7 h-7 text-white" />
+                        </div>
+                        <div>
+                            <h1 className="text-2xl font-bold" style={{ color: '#015023', fontFamily: 'Urbanist, sans-serif' }}>
+                                Input Presensi - Pertemuan {pertemuanKe}
+                            </h1>
+                            <p className="mt-0.5 text-base" style={{ color: '#015023', opacity: 0.75, fontFamily: 'Urbanist, sans-serif' }}>
+                                {classInfo?.code_subject || '-'} - {classInfo?.name_subject || '-'}
+                            </p>
+                            <div className="mt-3 flex flex-wrap gap-4 text-sm font-medium" style={{ color: '#015023' }}>
+                                <span className="flex items-center gap-1.5">
+                                    <Clock className="w-4 h-4" />
+                                    {hari}: {jamMulai} - {jamSelesai}
+                                </span>
+                                <span className="flex items-center gap-1.5">
+                                    <MapPin className="w-4 h-4" />
+                                    {lokasiLabel}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* GPS Section */}
+                <div className="rounded-2xl shadow-md overflow-hidden mb-4">
+                    <div className="px-6 py-4" style={{ backgroundColor: '#015023' }}>
+                        <div className="flex items-center gap-2">
+                            <Navigation className="w-5 h-5 text-white" />
+                            <span className="text-white font-semibold text-base" style={{ fontFamily: 'Urbanist, sans-serif' }}>
+                                Presensi Berbasis Lokasi
+                            </span>
+                        </div>
+                        <p className="text-white text-xs mt-0.5 opacity-75">Verifikasi lokasi diperlukan untuk mencatat presensi</p>
+                    </div>
+
+                    <div className="bg-white px-6 py-6">
+                        {/* Lokasi Mengajar Info */}
+                        <div className="rounded-xl p-4 mb-6" style={{ backgroundColor: '#f0faf4', border: '1px solid #c6e8d4' }}>
+                            <div className="flex items-start gap-3">
+                                <div className="p-2 rounded-lg shrink-0" style={{ backgroundColor: '#015023' }}>
+                                    <Building2 className="w-5 h-5 text-white" />
+                                </div>
+                                <div>
+                                    <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: '#015023', opacity: 0.6 }}>Lokasi Mengajar</p>
+                                    <p className="font-bold text-base" style={{ color: '#015023', fontFamily: 'Urbanist, sans-serif' }}>{lokasiLabel}</p>
+                                    <p className="text-sm mt-0.5" style={{ color: '#015023', opacity: 0.7 }}>
+                                        Radius valid <strong>150 meter</strong> dari gedung
+                                    </p>
+                                    {gpsCoords && gpsStatus !== GPS_STATUS.SUCCESS && (
+                                        <p className="text-xs mt-1" style={{ color: '#015023', opacity: 0.55 }}>
+                                            Koordinat: {gpsCoords.lat.toFixed(6)}, {gpsCoords.lng.toFixed(6)}
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* GPS Status */}
+                        <div className="flex flex-col items-center justify-center py-6">
+                            {renderGpsArea()}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Keterangan (hanya saat IDLE) */}
+                {gpsStatus === GPS_STATUS.IDLE && (
+                    <div className="bg-white rounded-2xl shadow-md px-6 py-5 mb-4">
+                        <p className="font-semibold mb-3" style={{ color: '#015023', fontFamily: 'Urbanist, sans-serif' }}>Keterangan</p>
+                        <ul className="space-y-1.5 text-sm" style={{ color: '#374151' }}>
+                            <li>• Presensi dilakukan berdasarkan verifikasi lokasi</li>
+                            <li>• Pastikan Anda berada di dalam gedung sebelum mengaktifkan lokasi</li>
+                            <li>• Izinkan akses lokasi saat browser meminta konfirmasi</li>
+                            <li>• Radius valid adalah <strong>150 meter</strong> dari tempat mengajar</li>
+                        </ul>
+                    </div>
+                )}
+
+                {/* Batal */}
+                <div className="bg-white rounded-2xl shadow-md px-6 py-4 flex justify-end">
+                    <button
+                        onClick={handleBack}
+                        className="px-6 py-2.5 font-semibold rounded-xl transition hover:opacity-90"
+                        style={{ backgroundColor: '#dc2626', color: 'white', fontFamily: 'Urbanist, sans-serif' }}
+                    >
+                        Batal
+                    </button>
+                </div>
+
             </div>
-            </div>
+
+            <AlertSuccessDialog
+                open={showSuccess}
+                onOpenChange={(o) => { if (!o) handleSuccessClose(); }}
+                title="Presensi Berhasil"
+                description={alertMsg}
+                closeText="OK"
+            />
+            <AlertErrorDialog
+                open={showError}
+                onOpenChange={setShowError}
+                title="Gagal"
+                description={alertMsg}
+                closeText="Tutup"
+            />
+            <Footer />
         </div>
-    )}
-    </div>
-    
-    {/* Alert Dialogs */}
-    <AlertConfirmationDialog
-        open={showConfirmDialog}
-        onOpenChange={setShowConfirmDialog}
-        title="Konfirmasi"
-        description={alertMessage}
-        confirmText="Ya, Lanjutkan"
-        cancelText="Batal"
-        onConfirm={confirmAction}
-    />
-    
-    <AlertSuccessDialog
-        open={showSuccessDialog}
-        onOpenChange={setShowSuccessDialog}
-        title="Berhasil"
-        description={alertMessage}
-        closeText="Tutup"
-    />
-    
-    <AlertErrorDialog
-        open={showErrorDialog}
-        onOpenChange={setShowErrorDialog}
-        title="Gagal"
-        description={alertMessage}
-        closeText="Tutup"
-    />
-    
-    <Footer />
-</div>
-);
+    );
+}
+
+// ── Shared Buttons ──────────────────────────────────────────
+function BtnDeteksi({ onClick }) {
+    return (
+        <button
+            onClick={onClick}
+            className="flex items-center gap-2 px-8 py-3 text-white font-semibold rounded-xl transition hover:opacity-90 shadow"
+            style={{ backgroundColor: '#015023', fontFamily: 'Urbanist, sans-serif' }}
+        >
+            <Navigation className="w-5 h-5" />
+            Deteksi Lokasi
+        </button>
+    );
+}
+
+function BtnCobaLagi({ onClick }) {
+    return (
+        <button
+            onClick={onClick}
+            className="flex items-center gap-2 px-8 py-3 font-semibold rounded-xl transition hover:bg-gray-50"
+            style={{ border: '1.5px solid #015023', color: '#015023', fontFamily: 'Urbanist, sans-serif' }}
+        >
+            <Navigation className="w-5 h-5" />
+            Coba Lagi
+        </button>
+    );
 }

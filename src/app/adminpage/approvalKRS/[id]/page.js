@@ -68,13 +68,18 @@ function mapDetail(apiData) {
     tanggal:  formatTanggal(krsArr),
     status:   deriveDetailStatus(d),
     matakuliah: krsArr.map((k) => ({
+      id_krs: k.id_krs,
       kode:   k.krsClass?.subject?.code_subject ?? k.subject?.code_subject ?? '-',
       nama:   k.krsClass?.subject?.name_subject ?? k.subject?.name_subject ?? '-',
       dosen:  (k.krsClass?.lecturers ?? []).map((l) => l.name).join(', ') || '-',
       jadwal: formatJadwal(k.krsClass),
       kelas:  k.krsClass?.code_class ? `Kelas ${k.krsClass.code_class}` : '-',
-      sks:    k.krsClass?.subject?.sks ?? k.subject?.sks ?? 0,
+      // BE bisa mengirim sks sebagai string → paksa ke Number agar penjumlahan total
+      // tidak terkonkatenasi (mis. "0"+"3"+"3" = "033").
+      sks:    Number(k.krsClass?.subject?.sks ?? k.subject?.sks ?? 0) || 0,
       jenis:  '-',   // BE tidak punya field wajib/pilihan
+      status: k.status ?? 'pending',
+      rejection_reason: k.rejection_reason ?? null,
     })),
     krs: krsArr,     // entri mentah untuk approve/reject per id_krs
   };
@@ -97,6 +102,9 @@ const STATUS_CONFIG = {
   disetujui: { label: 'Disetujui', bg: '#DCFCE7', text: '#15803D', border: '#86EFAC', Icon: CheckCircle2 },
   ditolak:   { label: 'Ditolak',   bg: '#FEE2E2', text: '#BE0414', border: '#FCA5A5', Icon: XCircle },
 };
+
+// Status entri KRS dari BE (English) → kunci STATUS_CONFIG (label Indonesia).
+const ROW_STATUS = { pending: 'menunggu', approved: 'disetujui', rejected: 'ditolak' };
 
 function StatusBadge({ status }) {
   const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.menunggu;
@@ -127,7 +135,7 @@ function JenisBadge({ jenis }) {
 }
 
 // ─── Approve Modal ────────────────────────────────────────────────────────────
-function ApproveModal({ open, onOpenChange, detail, onConfirm }) {
+function ApproveModal({ open, onOpenChange, detail, target, onConfirm }) {
   const [catatan, setCatatan] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -151,7 +159,7 @@ function ApproveModal({ open, onOpenChange, detail, onConfirm }) {
                 <ThumbsUp className="w-5 h-5" style={{ color: '#15803D' }} />
               </div>
               <div>
-                <AlertDialogTitle>Setujui KRS</AlertDialogTitle>
+                <AlertDialogTitle>{target ? 'Setujui Mata Kuliah' : 'Setujui KRS'}</AlertDialogTitle>
                 <p className="text-sm text-gray-500 mt-0.5">Konfirmasi Keputusan</p>
               </div>
             </div>
@@ -166,11 +174,20 @@ function ApproveModal({ open, onOpenChange, detail, onConfirm }) {
           <div className="rounded-xl p-4 text-sm space-y-1"
             style={{ backgroundColor: '#F0FFF4', border: '1px solid #86EFAC' }}>
             <p style={{ color: '#015023' }}><span className="font-semibold">Mahasiswa:</span> {detail.nama}</p>
-            <p style={{ color: '#015023' }}><span className="font-semibold">NIM:</span> {detail.nim}</p>
-            <p style={{ color: '#015023' }}>
-              <span className="font-semibold">Total SKS:</span>{' '}
-              {detail.matakuliah?.reduce((a, m) => a + m.sks, 0) ?? 0} SKS
-            </p>
+            {target ? (
+              <>
+                <p style={{ color: '#015023' }}><span className="font-semibold">Mata Kuliah:</span> {target.nama} ({target.kode})</p>
+                <p style={{ color: '#015023' }}><span className="font-semibold">SKS:</span> {target.sks} SKS</p>
+              </>
+            ) : (
+              <>
+                <p style={{ color: '#015023' }}><span className="font-semibold">NIM:</span> {detail.nim}</p>
+                <p style={{ color: '#015023' }}>
+                  <span className="font-semibold">Total SKS:</span>{' '}
+                  {detail.matakuliah?.reduce((a, m) => a + m.sks, 0) ?? 0} SKS
+                </p>
+              </>
+            )}
           </div>
         )}
 
@@ -189,7 +206,9 @@ function ApproveModal({ open, onOpenChange, detail, onConfirm }) {
             onBlur={e => (e.target.style.borderColor = '#E5E7EB')}
           />
           <p className="text-xs mt-1.5" style={{ color: '#6B7280' }}>
-            KRS mahasiswa akan disetujui dan mahasiswa dapat mengikuti perkuliahan.
+            {target
+              ? 'Mata kuliah ini akan disetujui untuk mahasiswa.'
+              : 'KRS mahasiswa akan disetujui dan mahasiswa dapat mengikuti perkuliahan.'}
           </p>
         </div>
 
@@ -209,7 +228,7 @@ function ApproveModal({ open, onOpenChange, detail, onConfirm }) {
 }
 
 // ─── Reject Modal ─────────────────────────────────────────────────────────────
-function RejectModal({ open, onOpenChange, detail, onConfirm }) {
+function RejectModal({ open, onOpenChange, detail, target, onConfirm }) {
   const [catatan, setCatatan] = useState('');
   const [loading, setLoading] = useState(false);
   const [catatanError, setCatatanError] = useState('');
@@ -239,7 +258,7 @@ function RejectModal({ open, onOpenChange, detail, onConfirm }) {
                 <ThumbsDown className="w-5 h-5" style={{ color: '#BE0414' }} />
               </div>
               <div>
-                <AlertDialogTitle style={{ color: '#BE0414' }}>Tolak KRS</AlertDialogTitle>
+                <AlertDialogTitle style={{ color: '#BE0414' }}>{target ? 'Tolak Mata Kuliah' : 'Tolak KRS'}</AlertDialogTitle>
                 <p className="text-sm text-gray-500 mt-0.5">Konfirmasi Keputusan</p>
               </div>
             </div>
@@ -254,11 +273,20 @@ function RejectModal({ open, onOpenChange, detail, onConfirm }) {
           <div className="rounded-xl p-4 text-sm space-y-1"
             style={{ backgroundColor: '#FFF5F5', border: '1px solid #FCA5A5' }}>
             <p style={{ color: '#015023' }}><span className="font-semibold">Mahasiswa:</span> {detail.nama}</p>
-            <p style={{ color: '#015023' }}><span className="font-semibold">NIM:</span> {detail.nim}</p>
-            <p style={{ color: '#015023' }}>
-              <span className="font-semibold">Total SKS:</span>{' '}
-              {detail.matakuliah?.reduce((a, m) => a + m.sks, 0) ?? 0} SKS
-            </p>
+            {target ? (
+              <>
+                <p style={{ color: '#015023' }}><span className="font-semibold">Mata Kuliah:</span> {target.nama} ({target.kode})</p>
+                <p style={{ color: '#015023' }}><span className="font-semibold">SKS:</span> {target.sks} SKS</p>
+              </>
+            ) : (
+              <>
+                <p style={{ color: '#015023' }}><span className="font-semibold">NIM:</span> {detail.nim}</p>
+                <p style={{ color: '#015023' }}>
+                  <span className="font-semibold">Total SKS:</span>{' '}
+                  {detail.matakuliah?.reduce((a, m) => a + m.sks, 0) ?? 0} SKS
+                </p>
+              </>
+            )}
           </div>
         )}
 
@@ -282,7 +310,9 @@ function RejectModal({ open, onOpenChange, detail, onConfirm }) {
           {catatanError
             ? <p className="text-xs mt-1.5 text-red-500">{catatanError}</p>
             : <p className="text-xs mt-1.5" style={{ color: '#BE0414' }}>
-                KRS mahasiswa akan ditolak dan mahasiswa harus memperbaiki KRS.
+                {target
+                  ? 'Mata kuliah ini akan ditolak dan mahasiswa harus memperbaikinya.'
+                  : 'KRS mahasiswa akan ditolak dan mahasiswa harus memperbaiki KRS.'}
               </p>
           }
         </div>
@@ -314,7 +344,9 @@ export default function DetailApprovalKRS() {
   const [currentStatus, setCurrentStatus] = useState(null);
 
   const [showApprove, setShowApprove]   = useState(false);
+  const [approveTarget, setApproveTarget] = useState(null); // null = semua pending; row = 1 matkul
   const [showReject, setShowReject]     = useState(false);
+  const [rejectTarget, setRejectTarget] = useState(null);   // null = semua pending; row = 1 matkul
   const [showSuccess, setShowSuccess]   = useState(false);
   const [showError, setShowError]       = useState(false);
   const [dialogMessage, setDialogMessage] = useState('');
@@ -342,20 +374,29 @@ export default function DetailApprovalKRS() {
   const totalSks = detail?.matakuliah?.reduce((a, m) => a + m.sks, 0) ?? 0;
   const totalMk  = detail?.matakuliah?.length ?? 0;
 
-  // BE approve/reject bersifat per-entri (id_krs), bukan per-mahasiswa.
-  // UI hanya punya 1 tombol per keputusan → proses semua entri pending sekaligus.
+  // Keputusan KRS bersifat per-entri (id_krs). Target null = semua MK pending sekaligus;
+  // target berisi 1 baris matkul = keputusan untuk MK itu saja.
+  const krsEntries    = detail?.krs ?? [];
+  const hasPending    = krsEntries.some((k) => k.status === 'pending');
+  const approvedCount = krsEntries.filter((k) => k.status === 'approved').length;
+  const rejectedCount = krsEntries.filter((k) => k.status === 'rejected').length;
+
   const handleApprove = async (catatan) => {
-    const pending = (detail?.krs ?? []).filter((k) => k.status === 'pending');
-    if (pending.length === 0) {
+    const isSingle = !!approveTarget;
+    const ids = isSingle
+      ? [approveTarget.id_krs]
+      : krsEntries.filter((k) => k.status === 'pending').map((k) => k.id_krs);
+    if (ids.length === 0) {
       setShowApprove(false);
       setDialogMessage('Tidak ada pengajuan KRS berstatus menunggu untuk disetujui.');
       setShowError(true);
       return;
     }
-    for (const k of pending) {
-      const { error: err } = await approveKRS(k.id_krs, catatan);
+    for (const id of ids) {
+      const { error: err } = await approveKRS(id, catatan);
       if (err) {
         setShowApprove(false);
+        setApproveTarget(null);
         setDialogMessage(resolveErrorMessage(err));
         setShowError(true);
         await load(); // refresh agar entri yang sudah diproses tercermin
@@ -363,24 +404,29 @@ export default function DetailApprovalKRS() {
       }
     }
     setShowApprove(false);
-    setCurrentStatus('disetujui');
-    setDialogMessage('KRS mahasiswa berhasil disetujui.');
+    setApproveTarget(null);
+    await load();
+    setDialogMessage(isSingle ? 'Mata kuliah berhasil disetujui.' : 'KRS mahasiswa berhasil disetujui.');
     setShowSuccess(true);
   };
 
   const handleReject = async (catatan) => {
-    const pending = (detail?.krs ?? []).filter((k) => k.status === 'pending');
-    if (pending.length === 0) {
+    const isSingle = !!rejectTarget;
+    const ids = isSingle
+      ? [rejectTarget.id_krs]
+      : krsEntries.filter((k) => k.status === 'pending').map((k) => k.id_krs);
+    if (ids.length === 0) {
       setShowReject(false);
       setDialogMessage('Tidak ada pengajuan KRS berstatus menunggu untuk ditolak.');
       setShowError(true);
       return;
     }
     // rejectKRS butuh confirmed === true; modal ini sudah berperan sebagai konfirmasi.
-    for (const k of pending) {
-      const { error: err } = await rejectKRS(k.id_krs, catatan, true);
+    for (const id of ids) {
+      const { error: err } = await rejectKRS(id, catatan, true);
       if (err) {
         setShowReject(false);
+        setRejectTarget(null);
         setDialogMessage(resolveErrorMessage(err));
         setShowError(true);
         await load();
@@ -388,8 +434,9 @@ export default function DetailApprovalKRS() {
       }
     }
     setShowReject(false);
-    setCurrentStatus('ditolak');
-    setDialogMessage('KRS mahasiswa berhasil ditolak.');
+    setRejectTarget(null);
+    await load();
+    setDialogMessage(isSingle ? 'Mata kuliah berhasil ditolak.' : 'KRS mahasiswa berhasil ditolak.');
     setShowSuccess(true);
   };
 
@@ -494,7 +541,7 @@ export default function DetailApprovalKRS() {
                 <table className="w-full">
                   <thead>
                     <tr style={{ backgroundColor: '#015023' }}>
-                      {['No', 'Kode MK', 'Mata Kuliah', 'Dosen', 'Jadwal & Kelas', 'SKS', 'Jenis'].map(h => (
+                      {['No', 'Kode MK', 'Mata Kuliah', 'Dosen', 'Jadwal & Kelas', 'SKS', 'Jenis', 'Status', 'Aksi'].map(h => (
                         <th key={h} className="p-4 text-center font-semibold text-white text-sm whitespace-nowrap">
                           {h}
                         </th>
@@ -521,6 +568,40 @@ export default function DetailApprovalKRS() {
                         <td className="p-4 text-center">
                           <JenisBadge jenis={mk.jenis} />
                         </td>
+                        {/* Status per matkul */}
+                        <td className="p-4 text-center">
+                          <StatusBadge status={ROW_STATUS[mk.status] ?? 'menunggu'} />
+                          {mk.status === 'rejected' && mk.rejection_reason && (
+                            <p className="text-xs mt-1.5 text-left" style={{ color: '#BE0414', maxWidth: 220 }}>
+                              {mk.rejection_reason}
+                            </p>
+                          )}
+                        </td>
+                        {/* Aksi per matkul — hanya untuk yang masih menunggu */}
+                        <td className="p-4 text-center">
+                          {mk.status === 'pending' ? (
+                            <div className="flex items-center justify-center gap-1.5">
+                              <button
+                                onClick={() => { setApproveTarget(mk); setShowApprove(true); }}
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-white text-xs font-semibold transition hover:opacity-85"
+                                style={{ backgroundColor: '#15803D' }}
+                              >
+                                <ThumbsUp className="w-3.5 h-3.5" />
+                                Setujui
+                              </button>
+                              <button
+                                onClick={() => { setRejectTarget(mk); setShowReject(true); }}
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-white text-xs font-semibold transition hover:opacity-85"
+                                style={{ backgroundColor: '#BE0414' }}
+                              >
+                                <ThumbsDown className="w-3.5 h-3.5" />
+                                Tolak
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-gray-400">—</span>
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -535,39 +616,46 @@ export default function DetailApprovalKRS() {
             </div>
           )}
 
-          {/* Action Buttons — only show when status is menunggu */}
-          {!loading && detail && currentStatus === 'menunggu' && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <button
-                onClick={() => setShowApprove(true)}
-                className="flex items-center justify-center gap-2 py-4 rounded-xl text-white font-bold text-base transition hover:opacity-90"
-                style={{ backgroundColor: '#15803D' }}
-              >
-                <ThumbsUp className="w-5 h-5" />
-                Setujui KRS
-              </button>
-              <button
-                onClick={() => setShowReject(true)}
-                className="flex items-center justify-center gap-2 py-4 rounded-xl text-white font-bold text-base transition hover:opacity-90"
-                style={{ backgroundColor: '#BE0414' }}
-              >
-                <ThumbsDown className="w-5 h-5" />
-                Tolak KRS
-              </button>
-            </div>
+          {/* Aksi massal — selesaikan semua MK pending sekaligus */}
+          {!loading && detail && hasPending && (
+            <>
+              <p className="text-xs text-gray-500 mb-2">
+                Gunakan tombol pada tiap baris untuk memutuskan per mata kuliah, atau tombol di bawah untuk semua sekaligus.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <button
+                  onClick={() => { setApproveTarget(null); setShowApprove(true); }}
+                  className="flex items-center justify-center gap-2 py-4 rounded-xl text-white font-bold text-base transition hover:opacity-90"
+                  style={{ backgroundColor: '#15803D' }}
+                >
+                  <ThumbsUp className="w-5 h-5" />
+                  Setujui Semua
+                </button>
+                <button
+                  onClick={() => { setRejectTarget(null); setShowReject(true); }}
+                  className="flex items-center justify-center gap-2 py-4 rounded-xl text-white font-bold text-base transition hover:opacity-90"
+                  style={{ backgroundColor: '#BE0414' }}
+                >
+                  <ThumbsDown className="w-5 h-5" />
+                  Tolak Semua KRS
+                </button>
+              </div>
+            </>
           )}
 
-          {/* Already decided */}
-          {!loading && detail && currentStatus !== 'menunggu' && (
+          {/* Semua MK sudah diputuskan */}
+          {!loading && detail && !hasPending && krsEntries.length > 0 && (
             <div className="rounded-xl p-4 text-center text-sm font-semibold"
               style={{
-                backgroundColor: currentStatus === 'disetujui' ? '#DCFCE7' : '#FEE2E2',
-                color: currentStatus === 'disetujui' ? '#15803D' : '#BE0414',
-                border: `1px solid ${currentStatus === 'disetujui' ? '#86EFAC' : '#FCA5A5'}`,
+                backgroundColor: rejectedCount === 0 ? '#DCFCE7' : approvedCount === 0 ? '#FEE2E2' : '#FEF3C7',
+                color: rejectedCount === 0 ? '#15803D' : approvedCount === 0 ? '#BE0414' : '#92400E',
+                border: `1px solid ${rejectedCount === 0 ? '#86EFAC' : approvedCount === 0 ? '#FCA5A5' : '#FCD34D'}`,
               }}>
-              {currentStatus === 'disetujui'
-                ? '✓ KRS ini telah disetujui.'
-                : '✗ KRS ini telah ditolak.'}
+              {rejectedCount === 0
+                ? '✓ Semua mata kuliah telah disetujui.'
+                : approvedCount === 0
+                  ? '✗ Semua mata kuliah telah ditolak.'
+                  : `Pengajuan telah diproses: ${approvedCount} disetujui, ${rejectedCount} ditolak.`}
             </div>
           )}
 
@@ -579,14 +667,16 @@ export default function DetailApprovalKRS() {
       {/* Modals */}
       <ApproveModal
         open={showApprove}
-        onOpenChange={setShowApprove}
+        onOpenChange={(v) => { setShowApprove(v); if (!v) setApproveTarget(null); }}
         detail={detail}
+        target={approveTarget}
         onConfirm={handleApprove}
       />
       <RejectModal
         open={showReject}
-        onOpenChange={setShowReject}
+        onOpenChange={(v) => { setShowReject(v); if (!v) setRejectTarget(null); }}
         detail={detail}
+        target={rejectTarget}
         onConfirm={handleReject}
       />
       <AlertSuccessDialog
