@@ -188,7 +188,7 @@ export default function PresensiDosenPage() {
                                 </div>
                                 <div style={S.gCard(false)}>
                                     <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 4 }}>% Hadir</div>
-                                    <div style={{ fontSize: 15, fontWeight: 700 }}>{slip ? `${persentase}%` : '—'}</div>
+                                    <div style={{ fontSize: 15, fontWeight: 700 }}>{slip ? `${pct}%` : '—'}</div>
                                 </div>
                                 <div style={S.gCard(true)}>
                                     <div style={{ fontSize: 11, color: '#5a3e00', marginBottom: 4 }}>

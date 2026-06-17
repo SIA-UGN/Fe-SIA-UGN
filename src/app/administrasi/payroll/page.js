@@ -217,7 +217,7 @@ function SlipGajiModal({ slip, rekap, profile, bulan, tahun, isFinal, onClose })
                             ['Nama',          profile?.full_name ?? profile?.name ?? '-'],
                             ['NIP',           profile?.employee_id_number ?? '-'],
                             ['Jabatan',       profile?.position ?? '-'],
-                            ['Program Studi', profile?.nama_program ?? '-'],
+                            ['Program Studi', profile?.program_name ?? profile?.nama_program ?? '-'],
                             ['Email',         profile?.email ?? '-'],
                         ].map(([label, value]) => (
                             <div key={label} style={{ display:'flex', fontSize:13, marginBottom:4 }}>
@@ -298,8 +298,7 @@ export default function PayrollPage() {
     const router = useRouter();
     const now    = new Date();
 
-    const prevMonth = now.getMonth() === 0 ? 12 : now.getMonth();
-    const [bulan, setBulanRaw] = useState(prevMonth);
+    const [bulan, setBulanRaw] = useState(now.getMonth() + 1); // default bulan berjalan (konsisten dgn manager)
     const [tahun, setTahun]    = useState(now.getFullYear());
 
     const [profile,  setProfile]  = useState(null);
@@ -317,7 +316,14 @@ export default function PayrollPage() {
             try {
                 const { default: api } = await import('@/lib/axios');
                 const res = await api.get('/profile/staff');
-                setProfile(res.data?.data ?? null);
+                let prof = res.data?.data ?? null;
+                // /profile/staff tidak menyertakan prodi → ambil program_name dari overview payroll
+                try {
+                    const ov = await api.get('/lecturer/payroll/overview');
+                    const pn = ov.data?.data?.lecturer?.program_name;
+                    if (pn) prof = { ...(prof || {}), program_name: pn };
+                } catch { /* ignore */ }
+                setProfile(prof);
             } catch { /* ignore */ }
         })();
     }, []);
@@ -440,7 +446,7 @@ export default function PayrollPage() {
                             {profile?.position ?? 'Dosen Tetap'}
                         </p>
                         <p style={{ margin: '2px 0 0', color: '#6b7280', fontSize: 13 }}>
-                            {profile?.nama_program ?? 'Program Studi'}
+                            {profile?.program_name ?? profile?.nama_program ?? 'Program Studi'}
                         </p>
                     </div>
                 </div>

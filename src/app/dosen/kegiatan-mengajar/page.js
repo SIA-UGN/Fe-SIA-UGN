@@ -186,7 +186,7 @@ export default function DashboardKegiatanMengajar() {
                         </h3>
                         <p className="text-green-200 text-xs">
                             {stats.selesai > 0
-                                ? `${stats.selesai} mata kuliah terverifikasi telah diklaim ke BKD Anda.`
+                                ? `${stats.selesai} mata kuliah terverifikasi — Angka Kredit siap diklaim lewat menu BKD (Angka Kredit).`
                                 : 'Belum ada mata kuliah yang selesai divalidasi.'}
                         </p>
                     </div>
